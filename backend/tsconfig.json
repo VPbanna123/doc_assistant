@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2016",
+    "module": "CommonJS",
+    "rootDir": "./",        // 👈 Set the root directory to the backend folder itself
+    "outDir": "./dist",     // 👈 Compiled JavaScript files will go inside "dist"
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node", "express"],
+    "noImplicitAny": false,
+    "typeRoots": ["./node_modules/@types", "./src/types"]
+  }
+}
