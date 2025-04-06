@@ -1,0 +1,182 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+**/.xcode.env.local
+
+# Android/IntelliJ
+build/
+.idea/
+.gradle/
+local.properties
+*.iml
+*.hprof
+.cxx/
+*.keystore
+!debug.keystore
+.kotlin/
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots/
+**/fastlane/test_output/
+
+# Bundle artifacts
+*.jsbundle
+
+# Ruby / CocoaPods
+**/Pods/
+/vendor/bundle/
+
+# Temporary Metro files
+.metro-health-check*
+
+# Testing & Coverage
+/coverage/
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# React Native / Expo
+.expo/
+.expo-shared/
+
+# Env files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Logs
+*.log
+
+# Watchman
+.watchmanconfig
+
+# Temporary files
+.tmp/
+
+# ESLint cache
+.eslintcache
+
+# Babel cache
+.babelrc
+.babelrc.js
+.babelrc.json
+.browserslistrc
+
+# Misc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore node_modules and build files
+frontend/node_modules/
+frontend/.env
+frontend/dist/
+
+# Ignore backend logs & environment files
+backend/node_modules/
+backend/.env
+backend/logs/
+
+# Ignore Python cache files & virtual environment
+py/__pycache__/
+py/venv/
+py/.env
+
+py/__pycache__/
+py/venv/
+py/.env
+py/.mypy_cache/
+py/.pytest_cache/
+py/*.pyc
+py/*.pyo
+py/.DS_Store
+py/.vscode/
+py/.idea/
+py/.tox/
+py/.coverage
+
+# Node.js
+backend/node_modules/
+backend/npm-debug.log
+backend/yarn-error.log
+
+# Logs
+backend/logs/
+backend/*.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/pids/
+backend/*.pid
+backend/*.seed
+backend/*.pid.lock
+
+# Environment Variables
+backend/.env
+backend/.env.local
+backend/.env.development
+backend/.env.production
+backend/.env.test
+
+# Dependencies
+backend/node_modules/
+
+# Build artifacts
+backend/dist/
+backend/build/
+
+# IDE/Editor files
+backend/.vscode/
+backend/.idea/
+backend/*.iml
+
+# Miscellaneous
+backend/.DS_Store
+backend/Thumbs.db
+
+# Temporary Files
+backend/.tmp/
+backend/.nyc_output/
+backend/coverage/
+
+# Database
+backend/*.sqlite
+backend/*.sqlite3
+
+# Debugging
+backend/*.swp
+backend/*.swo
+
+# Docker
+backend/.dockerignore
+backend/docker-compose.override.yml

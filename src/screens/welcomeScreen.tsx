@@ -118,17 +118,17 @@ const WelcomeScreen = ({ navigation }: { navigation: any }) => {
                       { 
                         translateY: wordAnimations[index].interpolate({
                           inputRange: [0, 1],
-                          outputRange: [20, 0] // Slide up effect
+                          outputRange: [20, 0] 
                         })
                       },
                       {
                         scale: wordAnimations[index].interpolate({
                           inputRange: [0, 0.5, 1],
-                          outputRange: [0.8, 1.2, 1] // Slight bounce effect
+                          outputRange: [0.8, 1.2, 1] 
                         })
                       }
                     ],
-                    marginRight: 8, // Space between words
+                    marginRight: 8, 
                   }
                 ]}
               >
@@ -137,17 +137,7 @@ const WelcomeScreen = ({ navigation }: { navigation: any }) => {
             ))}
           </View>
           
-          <Animated.Text 
-            style={[
-              styles.subText,
-              {
-                opacity: subtitleOpacity,
-                transform: [{ scale: subtitleScale }],
-              }
-            ]}
-          >
-            Please log in or sign up to continue.
-          </Animated.Text>
+      
         </View>
 
         {/* React Native Logo Animation */}

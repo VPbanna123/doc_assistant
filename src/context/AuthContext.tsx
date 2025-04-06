@@ -20,7 +20,7 @@
 import React, { createContext, useState, useEffect, ReactNode, useContext } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as authApi from '../api/authApi';
-
+import { sendPasswordResetEmail, resetPassword } from '../services/authService';
 // Re-export the User interface from authApi
 export type { User } from '../api/authApi';
 
@@ -34,6 +34,8 @@ interface AuthContextType {
   error: string | null;
   
   updateUserProfile: (updates: Partial<authApi.User>) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,8 +61,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const savedToken = await AsyncStorage.getItem('authToken');
         
+        // if (savedToken) {
+        //   setToken(savedToken);
+        //   const userData = await authApi.getUserProfile();
+        //   setUser(userData);
+        // }
         if (savedToken) {
-          setToken(savedToken);
+          try {
+            // Try parsing the token in case it was stored as a stringified JSON object
+            const parsedToken = JSON.parse(savedToken);
+            setToken(parsedToken);
+          } catch (parseError) {
+            // If the token is a simple string, set it directly without parsing
+            setToken(savedToken);
+          }
+  
+          // Retrieve the user profile using the saved token
           const userData = await authApi.getUserProfile();
           setUser(userData);
         }
@@ -146,6 +162,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     }
   };
+  const forgotPassword = async (email: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await sendPasswordResetEmail(email);
+    } catch (error: any) {
+      setError(error.message || 'Failed to send reset email');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (token: string, newPassword: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await resetPassword(token, newPassword);
+    } catch (error: any) {
+      setError(error.message || 'Failed to reset password');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
   // Add to your AuthContext.tsx
 const checkAuthStatus = async () => {
   try {
@@ -186,7 +227,9 @@ useEffect(() => {
       logout, 
       loading, 
       error,
-      updateUserProfile
+      updateUserProfile,
+      forgotPassword,
+      resetPassword: handleResetPassword
     }}>
       {children}
     </AuthContext.Provider>

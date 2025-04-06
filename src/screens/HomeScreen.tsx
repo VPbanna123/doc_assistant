@@ -2,14 +2,14 @@
 import React, { useEffect, useRef, useState,useContext } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, ImageBackground } from "react-native";
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import UploadPage from "../video/uploadPage";
+
 import { AuthContext } from "../context/AuthContext";
 
 const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
   // Get user data from route params or context
-  // const user = route.params?.user || { name: "User", email: "user@example.com" };
+
   const authContext = useContext(AuthContext);
-  
+  const logout=useContext(AuthContext)
   if (!authContext) {
     throw new Error("HomeScreen must be used within an AuthProvider");
   }
@@ -40,7 +40,7 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
   };
 
   // Get display name
-  // const displayName = user.name === "User" ? extractNameFromEmail(user.email) : user.name;
+ 
   const displayName = user ? extractNameFromEmail(user.email) : "User";
   
   // Function to toggle dropdown
@@ -59,6 +59,15 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
     if (displayName.length > 15) return 12;
     if (displayName.length > 10) return 14;
     return 16;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authContext.logout(); // Logs out user and resets state
+      console.log("User logged out successfully.");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   useEffect(() => {
@@ -93,7 +102,7 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
 
   return (
     <ImageBackground 
-      source={require('../assets/new.jpg')} 
+      source={require('../assets/bg_health.jpg')} 
       style={styles.backgroundImage}
     >
       <View style={styles.container}>
@@ -135,10 +144,12 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
           
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={() => navigation.navigate("Login")}
+            // onPress={() => navigation.navigate("Login")
+            onPress={handleLogout}
           >
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
+          
         </View>
 
         {/* Main Content */}
@@ -175,7 +186,6 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
                   Upload video or audio files for AI analysis
                 </Text>
               </View>
-              {/* <MaterialIcons name="chevron-right" size={24} color="#aaa" /> */}
             </TouchableOpacity>
             
             {/* Meeting option */}
@@ -184,7 +194,6 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
               onPress={() => navigation.navigate("MeetingPage")}
             >
               <View style={styles.optionIconContainer}>
-                {/* <MaterialIcons name="video-call" size={36} color="#32CD32" /> */}
                 <Image 
       source={require('../assets/meeting.jpg')} 
       style={{ width: 45, height: 45, zIndex: 1 }} 
@@ -196,14 +205,12 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
                   Begin an online video conversation
                 </Text>
               </View>
-              {/* <MaterialIcons name="chevron-right" size={24} color="#aaa" /> */}
             </TouchableOpacity>
             <TouchableOpacity 
   style={styles.optionCard}
   onPress={() => navigation.navigate("Chatbot")}
 >
   <View style={styles.optionIconContainer}>
-    {/* <MaterialIcons name="chat" size={36} color="#1E90FF" /> */}
     <Image 
       source={require('../assets/chat_ai.png')} 
       style={{ width: 45, height: 45, zIndex: 1 }} 
@@ -215,25 +222,11 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
       Get health-related insights from the chatbot
     </Text>
   </View>
-  {/* <MaterialIcons name="chevron-right" size={24} color="#aaa" /> */}
 </TouchableOpacity>
           </Animated.View>
         </View>
 
-        {/* Rotating Logo Animation */}
-        {/* <Animated.View
-          style={[
-            styles.reactLogoContainer,
-            {
-              transform: [{ rotate: rotateInterpolate }],
-            },
-          ]}
-        >
-          {/* <Image
-            source={require('../assets/logo.jpg')}
-            style={styles.reactLogo}
-          /> */}
-        {/* </Animated.View> */} 
+        
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -327,23 +320,23 @@ const styles = StyleSheet.create({
     padding: 5, 
     paddingVertical: 8, 
     paddingHorizontal: 12, 
-    backgroundColor: "#fff", // White background for a clean look
+    backgroundColor: "#fff", 
     borderRadius: 20, 
-    borderWidth: 1, // Adds a subtle border
-    borderColor: "rgba(0, 0, 0, 0.1)", // Light gray border
+    borderWidth: 1, 
+    borderColor: "rgba(0, 0, 0, 0.1)", 
     zIndex: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2, // Softer shadow
+    shadowOpacity: 0.2, 
     shadowRadius: 4.65,
     elevation: 6,
   },
   logoutText: {
-    color: "#000", // Black text for better contrast
+    color: "#000", 
     fontSize: 14,
     fontWeight: "bold",
-    textTransform: "uppercase", // Gives a modern look
-    letterSpacing: 0.7, // Slight spacing for readability
+    textTransform: "uppercase", 
+    letterSpacing: 0.7, 
   },
   mainContent: {
     flex: 1,
@@ -375,7 +368,7 @@ const styles = StyleSheet.create({
     width: 65,
     height: 65,
     borderRadius: 32.5,
-    backgroundColor: "#fff", // Slightly more transparent for a sleek effect
+    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 15,
@@ -383,23 +376,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 6, // For Android shadow
+    elevation: 6, 
   },
   optionTextContainer: {
     flex: 1,
   },
   optionTitle: {
     color: "#fff",
-    fontSize: 20, // Slightly bigger for better readability
+    fontSize: 20, 
     fontWeight: "bold",
     marginBottom: 5,
     letterSpacing: 0.8,
-    textTransform: "uppercase", // Modern and professional look
+    textTransform: "uppercase",
   },
   optionDescription: {
-    color: "#ddd", // Brighter gray for better visibility
+    color: "#ddd", 
     fontSize: 15,
-    lineHeight: 20, // Adds better spacing
+    lineHeight: 20, 
   },
   reactLogoContainer: {
     width: 80,

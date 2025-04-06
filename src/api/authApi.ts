@@ -9,7 +9,9 @@ import {
     getToken,
     isAuthenticated,
     User,
-    AuthResponse
+    AuthResponse,
+    sendPasswordResetEmail, 
+    resetPassword,
   } from '../services/authService';
   
   // Re-export interfaces
@@ -26,6 +28,8 @@ import {
     signUp,
     updateProfile,
     isAuthenticated,
-    getToken 
+    getToken ,
+    sendPasswordResetEmail, 
+    resetPassword,
   };
   

@@ -6,22 +6,20 @@ import dotenv from 'dotenv';
 // import mongoose from 'mongoose';
 import router from './routes/authRoutes';
 import connectDB from './db/connectDb';
-import aiRouter from './routes/aiRoute'
+// import aiRouter from './routes/aiRoute'
 import bodyParser from 'body-parser';
 dotenv.config();
 
 const app = express();
 app.use(cors({ origin: '*', credentials: true }));  
 app.use(express.json()); 
-app.use(bodyParser.json()); // ✅ Allows JSON body parsing
-// app.use(express.json());    // ✅ Ensures JSON support
+app.use(bodyParser.json()); 
 
-// Register authentication routes with API prefix
+
+
 app.use('/api/auth', router);
 
-// Register AI routes with API prefix
-// app.use('/api/ai', aiRouter);
-// MongoDB Connection
+
 connectDB(); 
 
 const server = http.createServer(app);

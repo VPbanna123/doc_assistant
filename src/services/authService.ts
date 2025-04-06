@@ -28,7 +28,7 @@ const handleApiResponse = async <T>(response: Response): Promise<T> => {
 // Store auth token
 export const storeToken = async (token: string): Promise<void> => {
   try {
-    await AsyncStorage.setItem('authToken', token);
+    await AsyncStorage.setItem('authToken', JSON.stringify(token));
   } catch (error) {
     console.error('Error storing auth token', error);
     throw new Error('Failed to store authentication token');
@@ -149,4 +149,50 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 export const isAuthenticated = async (): Promise<boolean> => {
   const token = await getToken();
   return !!token;
+};
+
+export const sendPasswordResetEmail = async (email: string): Promise<void> => {
+  try {
+    const response = await fetch(`${API_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to send reset email');
+    }
+    
+    return data;
+  } catch (error: any) {
+    console.error('Password reset error:', error);
+    throw new Error(error.message || 'Failed to send reset email');
+  }
+};
+
+export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  try {
+    const response = await fetch(`${API_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to reset password');
+    }
+    
+    return data;
+  } catch (error: any) {
+    console.error('Password reset error:', error);
+    throw new Error(error.message || 'Failed to reset password');
+  }
 };

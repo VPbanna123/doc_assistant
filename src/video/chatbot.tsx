@@ -12,14 +12,16 @@ import {
   Image,
   Animated,
   Dimensions,
+  PermissionsAndroid,
+  Alert,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { pick, types, errorCodes, isErrorWithCode } from '@react-native-documents/picker';
-// import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
-
+import Markdown from "react-native-markdown-display";
+import RNFS from 'react-native-fs'; 
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 const { width } = Dimensions.get('window');
-
+const audioRecorderPlayer = new AudioRecorderPlayer();
 interface Message {
   id: string;
   text: string;
@@ -27,18 +29,40 @@ interface Message {
   timestamp: Date;
   isLoading?: boolean;
 }
+async function requestMicrophonePermission() {
+  if (Platform.OS === 'android') {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: 'Microphone Permission',
+          message: 'App needs access to your microphone for voice search',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.error('Permission error:', err);
+      return false;
+    }
+  }
+  return true;
+}
 
 const ChatbotScreen = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your AI assistant. How can I help you today?',
+      text: "Hello! I'm your AI assistant. How can I help you today?",
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false); // State for voice recording
   const flatListRef = useRef<FlatList>(null);
   const inputOpacity = useRef(new Animated.Value(1)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
@@ -51,17 +75,97 @@ const ChatbotScreen = () => {
       }, 200);
     }
   }, [messages]);
+  const recordAudio = async () => {
+    try {
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        Alert.alert('Permission required', 'Microphone access is needed for voice search');
+        return '';
+      }
+
+      const audioPath = Platform.OS === 'android' 
+        ? RNFS.ExternalDirectoryPath + '/audio.wav'
+        : RNFS.LibraryDirectoryPath + '/audio.wav';
+
+      await audioRecorderPlayer.startRecorder(audioPath, {
+        AudioEncoderAndroid: 3,
+        AudioSourceAndroid: 1,
+        OutputFormatAndroid: 2,
+        AudioEncodingBitRateAndroid: 128000,
+        AudioSamplingRateAndroid: 16000,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      const result = await audioRecorderPlayer.stopRecorder();
+      audioRecorderPlayer.removeRecordBackListener();
+
+      return await RNFS.readFile(result, 'base64');
+    } catch (error) {
+      console.error('Recording failed:', error);
+      return '';
+    }
+  };
+  
+
+  const startVoiceRecognition = async () => {
+    try {
+      setIsRecording(true);
+      const audioData = await recordAudio();
+
+      if (!audioData) {
+        throw new Error('Failed to record audio');
+      }
+
+      // Send the recorded audio to your backend for processing
+      const formData = new FormData();
+      formData.append('audio', {
+        uri: `data:audio/wav;base64,${audioData}`,
+        type: 'audio/wav',
+        name: 'recording.wav'
+      } as any);
+      const response = await axios.post(
+        'http://127.0.0.1:5002/api/voice/process',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      if (response.data.transcription) {
+        setInputText(response.data.transcription);
+        setMessages((prev) => [
+          ...prev,
+          { id: Date.now().toString(), text: response.data.transcription, isUser: true, timestamp: new Date() },
+          { id: (Date.now() + 1).toString(), text: response.data.reply, isUser: false, timestamp: new Date() },
+        ]);
+      }
+    } catch (error) {
+      console.error('Voice recognition error:', error);
+      Alert.alert('Error', 'Failed to process voice input');
+    } finally {
+      setIsRecording(false);
+    }
+  };
+
+  
+  const stopVoiceRecognition = async () => {
+    try {
+      setIsRecording(false);
+      // Stop recording logic here
+    } catch (error) {
+      console.error('Error stopping voice recognition:', error);
+    }
+  };
 
   const handleSend = async () => {
     if (inputText.trim() === '') return;
-  
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text: inputText,
       isUser: true,
       timestamp: new Date(),
     };
-  
+
     const loadingMessage: Message = {
       id: (Date.now() + 1).toString(),
       text: '',
@@ -69,31 +173,25 @@ const ChatbotScreen = () => {
       timestamp: new Date(),
       isLoading: true,
     };
-  
+
     setMessages((prevMessages) => [...prevMessages, userMessage, loadingMessage]);
     setInputText('');
     setIsLoading(true);
-  
+
     try {
-      const response = await axios.post('http://127.0.0.1:5002/chatbot', {
-        message: userMessage.text,
-      },);
-  
-      console.log('API Response:', response.data); // Debugging log
-  
-      // Ensure response has valid data
+      const response = await axios.post('http://127.0.0.1:5002/chatbot', { message: userMessage.text });
+
       if (!response.data || !response.data.reply) {
         throw new Error('Invalid response from backend');
       }
-  
-      // Remove loading message and add bot response
+
       setMessages((prevMessages) => {
         const filtered = prevMessages.filter((msg) => !msg.isLoading);
         return [
           ...filtered,
           {
             id: Date.now().toString(),
-            text: response.data.reply, // ✅ Using actual reply
+            text: response.data.reply,
             isUser: false,
             timestamp: new Date(),
           },
@@ -117,242 +215,38 @@ const ChatbotScreen = () => {
       setIsLoading(false);
     }
   };
-  
-  const pickAudio = async () => {
-    try {
-      const result = await pick({
-        type: [types.audio],
-        allowMultiSelection: false,
-      });
-  
-      if (!result || result.length === 0) return;
-  
-      setIsLoading(true);
-      const loadingMessage: Message = {
-        id: Date.now().toString(),
-        text: 'Transcribing audio...',
-        isUser: false,
-        timestamp: new Date(),
-        isLoading: true,
-      };
-      setMessages((prevMessages) => [...prevMessages, loadingMessage]);
-  
-      const formData = new FormData();
-      formData.append('file', {
-        uri: result[0].uri,
-        type: result[0].type,
-        name: result[0].name,
-      } as any);
-  
-      const response = await axios.post('http://your-api-url/api/transcribe', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-  
-      setMessages((prevMessages) => {
-        const filtered = prevMessages.filter((msg) => !msg.isLoading);
-        return [
-          ...filtered,
-          {
-            id: Date.now().toString(),
-            text: `Transcription: ${response.data.transcript}`,
-            isUser: false,
-            timestamp: new Date(),
-          },
-        ];
-      });
-    } catch (error) {
-        if (isErrorWithCode(error) && error.code === errorCodes.OPERATION_CANCELED) {
-            console.log('User canceled document picker');
-            return;
-          }
-      console.error('Error picking audio:', error);
-      setMessages((prevMessages) => {
-        const filtered = prevMessages.filter((msg) => !msg.isLoading);
-        return [
-          ...filtered,
-          {
-            id: Date.now().toString(),
-            text: 'Sorry, there was an error transcribing your audio.',
-            isUser: false,
-            timestamp: new Date(),
-          },
-        ];
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
 
-  const pickImage = async () => {
-    try {
-      const result = await pick({
-        type: [types.images],
-        allowMultiSelection: false,
-      });
-  
-      if (!result || result.length === 0) return;
-  
-      setIsLoading(true);
-      const loadingMessage: Message = {
-        id: Date.now().toString(),
-        text: 'Extracting text from image...',
-        isUser: false,
-        timestamp: new Date(),
-        isLoading: true,
-      };
-      setMessages((prevMessages) => [...prevMessages, loadingMessage]);
-  
-      const formData = new FormData();
-      formData.append('image', {
-        uri: result[0].uri,
-        type: result[0].type,
-        name: result[0].name,
-      } as any);
-  
-      const response = await axios.post('http://your-api-url/api/extract-text', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-  
-      setMessages((prevMessages) => {
-        const filtered = prevMessages.filter((msg) => !msg.isLoading);
-        return [
-          ...filtered,
-          {
-            id: Date.now().toString(),
-            text: `Extracted Text: ${response.data.text}`,
-            isUser: false,
-            timestamp: new Date(),
-          },
-        ];
-      });
-    } catch (error) {
-        if (isErrorWithCode(error) && error.code === errorCodes.OPERATION_CANCELED) {
-            console.log('User canceled document picker');
-            return;
-          }
-      console.error('Error picking image:', error);
-      setMessages((prevMessages) => {
-        const filtered = prevMessages.filter((msg) => !msg.isLoading);
-        return [
-          ...filtered,
-          {
-            id: Date.now().toString(),
-            text: 'Sorry, there was an error extracting text from your image.',
-            isUser: false,
-            timestamp: new Date(),
-          },
-        ];
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   const handleInputFocus = () => {
-    Animated.timing(inputOpacity, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(inputOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
   };
 
   const handleButtonPress = () => {
     Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
+      Animated.timing(buttonScale, { toValue: 0.9, duration: 100, useNativeDriver: true }),
+      Animated.timing(buttonScale, { toValue: 1, duration: 100, useNativeDriver: true }),
     ]).start();
     handleSend();
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    if (item.isLoading) {
-      return (
-        <View style={[styles.messageContainer, styles.botMessageContainer]}>
-          <View style={styles.botAvatar}>
-          <Image 
-  source={require('../assets/robo.jpg')} 
-  style={{ width: 20, height: 20, zIndex: 1, position: 'relative' }} 
-/>
-          </View>
-          <View style={[styles.messageBubble, styles.botMessageBubble]}>
-            <ActivityIndicator size="small" color="#fff" />
-          </View>
+  const renderMessage = ({ item }: { item: Message }) => (
+    <View style={[styles.messageContainer, item.isUser ? styles.userMessageContainer : styles.botMessageContainer]}>
+      {!item.isUser && (
+        <View style={styles.botAvatar}>
+          <Image source={require('../assets/gemini.png')} style={{ width: 27, height: '80%',padding: 5,resizeMode: 'contain' }} />
         </View>
-      );
-    }
-
-    return (
-      <View
-        style={[
-          styles.messageContainer,
-          item.isUser ? styles.userMessageContainer : styles.botMessageContainer,
-        ]}
-      >
-        {!item.isUser && (
-          <View style={styles.botAvatar}>
-            {/* <MaterialIcons name="smart-toy" size={20} color="#fff" />
-             */}
-              <Image 
-  source={require('../assets/robo.jpg')} 
-  style={{ width: 20, height: 20, zIndex: 1, position: 'relative' }} 
-/>
-          
-          </View>
-        )}
-        <View
-          style={[
-            styles.messageBubble,
-            item.isUser ? styles.userMessageBubble : styles.botMessageBubble,
-          ]}
-        >
-          <Text style={styles.messageText}>{item.text}</Text>
-          <Text style={styles.timestampText}>{formatTime(item.timestamp)}</Text>
-        </View>
-        {item.isUser && (
-          <View style={styles.userAvatar}>
-            {/* <MaterialIcons name="person" size={20} color="#fff" /> */}
-            <Image 
-  source={require('../assets/emoji.jpg')} 
-  style={{ width: 20, height: 20, zIndex: 1, position: 'relative' }} 
-/>
-          
-          </View>
-        )}
+      )}
+      <View style={[styles.messageBubble, item.isUser ? styles.userMessageBubble : styles.botMessageBubble]}>
+        <Text style={styles.messageText}><Markdown>{item.text}</Markdown></Text>
+        <Text style={styles.timestampText}>{formatTime(item.timestamp)}</Text>
       </View>
-    );
-  };
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          {/* <MaterialIcons name="smart-toy" size={24} color="#fff" /> */}
-          <Image 
-  source={require('../assets/robo.jpg')} 
-  style={{ width: 20, height: 20, zIndex: 1, position: 'relative' }} 
-/>
-          
-          <Text style={styles.headerTitle}>AI Assistant</Text>
-        </View>
-      </View>
-
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -361,34 +255,21 @@ const ChatbotScreen = () => {
         contentContainerStyle={styles.messagesContainer}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachButton} onPress={pickAudio}>
-            {/* <MaterialIcons name="mic" size={24} color="#FF6347" />
-             */}
-              <Image 
-                   source={require('../assets/video.jpg')} 
-                   style={{ width: 20, height: 20, zIndex: 1 }} 
-                 />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
-            {/* <MaterialIcons name="image" size={24} color="#32CD32" /> */}
-               <Image 
-                  source={require('../assets/upload.jpeg')} 
-                  style={{ width: 40, height: 40, zIndex: 1 }} 
-                />
-          </TouchableOpacity>
-          <Animated.View
-            style={[
-              styles.textInputContainer,
-              {
-                opacity: inputOpacity,
-              },
-            ]}
+          {/* Voice Button */}
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={isRecording ? stopVoiceRecognition : startVoiceRecognition}
           >
+           <Image 
+                 source={require('../assets/mic.svg')} 
+                 style={{ width: 25, height: 25 ,resizeMode: 'contain',}}
+               />
+          </TouchableOpacity>
+
+          {/* Text Input */}
+          <Animated.View style={[styles.textInputContainer, { opacity: inputOpacity }]}>
             <TextInput
               style={styles.input}
               value={inputText}
@@ -399,20 +280,15 @@ const ChatbotScreen = () => {
               multiline
             />
           </Animated.View>
-          <Animated.View
-            style={{
-              transform: [{ scale: buttonScale }],
-            }}
-          >
+
+          {/* Send Button */}
+          <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
             <TouchableOpacity
               style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
               onPress={handleButtonPress}
               disabled={!inputText.trim() || isLoading}
             >
-                 <Image 
-      source={require('../assets/send.jpg')} 
-      style={{ width: 45, height: 45, zIndex: 1 }} 
-    />
+              <Image source={require('../assets/send.png')} style={{ width: 45, height: 45 ,resizeMode: 'contain'}} />
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -470,15 +346,15 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 1,
+    shadowRadius: 2,
   },
   userMessageBubble: {
-    backgroundColor: '#4a6da7',
+    backgroundColor: 'rgba(128, 185, 223, 0.7)',
     borderBottomRightRadius: 5,
     marginRight: 5,
   },
   botMessageBubble: {
-    backgroundColor: '#6c8cbf',
+    backgroundColor: 'rgba(128, 185, 223, 0.7)',
     borderBottomLeftRadius: 5,
     marginLeft: 5,
   },
@@ -543,6 +419,13 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#e0e0e0',
+  },
+  markdownText: {
+    fontSize: 16,
+    color: '#fff', 
+  },
+  voiceButton: { // Style for voice button
+    padding: 10,
   },
 });
 

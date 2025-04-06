@@ -1,3 +1,4 @@
+import { FileSystem, Dirs } from 'react-native-file-access';
 
 import React, { useState } from 'react';
 import {
@@ -9,16 +10,21 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  Image
+  Image,
+  ImageBackground
 } from 'react-native';
 import { pick, types, errorCodes, isErrorWithCode } from '@react-native-documents/picker';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import { StackNavigationProp } from '@react-navigation/stack';
 // import Arrow from '../assets/arrow.svg';
+import RNFS from 'react-native-fs';
+import {  PermissionsAndroid } from 'react-native';
+import Markdown from "react-native-markdown-display";
 
 // Define API endpoints
 const API_BASE_URL = 'http://127.0.0.1:5002';
+const history_url='http://127.0.0.1:5000/save-history'
 const FULL_WORKFLOW_URL = `${API_BASE_URL}/full-workflow`;
 
 // Navigation Props
@@ -121,7 +127,29 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
     setSummary('');
     setActiveTab('transcript');
   };
-
+  // const saveProcessingHistory = async (audioFile: File|null, imageFile: File | null) => {
+  //   try {
+  //     const historyData = {
+  //       audioFile,
+  //       imageFile,
+  //       processedAt: new Date().toISOString()
+  //     };
+  
+  //     const response = await axios.post(history_url, historyData, {
+  //       headers: { 'Content-Type': 'application/json' }
+  //     });
+  
+  //     if (response.data.success) {
+  //       console.log('Processing history saved successfully');
+  //     } else {
+  //       console.error('Failed to save processing history');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error saving processing history:', error);
+  //     Alert.alert('History Save Error', 'Failed to save processing history. Please try again.');
+  //   }
+  // };
+  
   // Process Files through Full Workflow
   const processFiles = async () => {
     if (!audioFile) {
@@ -151,6 +179,8 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
         } as any);
       }
 
+      // await saveProcessingHistory(audioFile, imageFile);
+
       // Call full workflow endpoint
       const response = await axios.post(FULL_WORKFLOW_URL, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -172,7 +202,7 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
       if (response.data.summary) {
         setSummary(response.data.summary);
       }
-      
+   
     } catch (error) {
       console.error('Error processing files:', error);
       let errorMessage = 'Failed to process your files. Please try again.';
@@ -190,11 +220,48 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
       }
       
       Alert.alert('Processing Error', errorMessage);
-    } finally {
+    } 
+    finally {
       setIsProcessing(false);
       setUploadProgress(1);
     }
   };
+
+// Add this function to your component
+
+const saveReportToDownloads = async () => {
+  // Create report content
+  const reportContent = `MEDICAL REPORT\n\n` +
+    `TRANSCRIPT:\n${transcript}\n\n` +
+    `ANALYSIS:\n${analysis}\n\n` +
+    (extractedText ? `EXTRACTED TEXT:\n${extractedText}\n\n` : '') +
+    (summary ? `SUMMARY:\n${summary}` : '');
+  
+  try {
+    // First save to app's document directory
+    const fileName = `MedicalReport_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    const tempPath = `${Dirs.DocumentDir}/${fileName}`;
+    
+    // Write the file to document directory
+    await FileSystem.writeFile(tempPath, reportContent, 'utf8');
+    
+    // Then copy to external downloads folder
+    await FileSystem.cpExternal(tempPath, fileName, 'downloads');
+    
+    // Show success message
+    Alert.alert(
+      "Report Saved",
+      `Your report has been saved to Downloads as "${fileName}"`,
+      [{ text: "OK" }]
+    );
+    
+    console.log('Report saved successfully');
+  } catch (error) {
+    console.error('Error saving report:', error);
+    Alert.alert("Save Failed", "Could not save the report. Please try again.");
+  }
+};
+
 
  
 const renderDashboard = () => {
@@ -205,7 +272,7 @@ const renderDashboard = () => {
           style={[styles.tab, activeTab === 'transcript' && styles.activeTab]} 
           onPress={() => setActiveTab('transcript')}
         >
-          <MaterialIcons name="record-voice-over" size={20} color={activeTab === 'transcript' ? '#fff' : '#aaa'} />
+          {/* <MaterialIcons name="record-voice-over" size={20} color={activeTab === 'transcript' ? '#fff' : '#aaa'} /> */}
           <Text style={[styles.tabText, activeTab === 'transcript' && styles.activeTabText]}>Transcript</Text>
         </TouchableOpacity>
         
@@ -213,7 +280,7 @@ const renderDashboard = () => {
           style={[styles.tab, activeTab === 'analysis' && styles.activeTab]} 
           onPress={() => setActiveTab('analysis')}
         >
-          <MaterialIcons name="analytics" size={20} color={activeTab === 'analysis' ? '#fff' : '#aaa'} />
+          {/* <MaterialIcons name="analytics" size={20} color={activeTab === 'analysis' ? '#fff' : '#aaa'} /> */}
           <Text style={[styles.tabText, activeTab === 'analysis' && styles.activeTabText]}>Analysis</Text>
         </TouchableOpacity>
         
@@ -222,7 +289,7 @@ const renderDashboard = () => {
             style={[styles.tab, activeTab === 'ocr' && styles.activeTab]} 
             onPress={() => setActiveTab('ocr')}
           >
-            <MaterialIcons name="document-scanner" size={20} color={activeTab === 'ocr' ? '#fff' : '#aaa'} />
+            {/* <MaterialIcons name="document-scanner" size={20} color={activeTab === 'ocr' ? '#fff' : '#aaa'} /> */}
             <Text style={[styles.tabText, activeTab === 'ocr' && styles.activeTabText]}>OCR</Text>
           </TouchableOpacity>
         )}
@@ -232,7 +299,7 @@ const renderDashboard = () => {
             style={[styles.tab, activeTab === 'summary' && styles.activeTab]} 
             onPress={() => setActiveTab('summary')}
           >
-            <MaterialIcons name="summarize" size={20} color={activeTab === 'summary' ? '#fff' : '#aaa'} />
+            {/* <MaterialIcons name="summarize" size={20} color={activeTab === 'summary' ? '#fff' : '#aaa'} /> */}
             <Text style={[styles.tabText, activeTab === 'summary' && styles.activeTabText]}>Summary</Text>
           </TouchableOpacity>
         )}
@@ -248,7 +315,7 @@ const renderDashboard = () => {
               />
               <Text style={[styles.cardTitle, { color: 'white' }]}>Medical Transcript</Text>
             </View>
-            <Text style={[styles.contentText]}>{transcript}</Text>
+            <Text style={[styles.contentText]}><Markdown>{transcript}</Markdown></Text>
           </View>
         )}
         
@@ -261,7 +328,7 @@ const renderDashboard = () => {
               />
               <Text style={[styles.cardTitle, { color: 'white' }]}>AI Analysis</Text>
             </View>
-            <Text style={[styles.contentText]}>{analysis}</Text>
+            <Text style={[styles.contentText]}><Markdown>{analysis}</Markdown></Text>
           </View>
         )}
         
@@ -274,7 +341,7 @@ const renderDashboard = () => {
               />
               <Text style={[styles.cardTitle, { color: 'white' }]}>Extracted Text</Text>
             </View>
-            <Text style={[styles.contentText]}>{extractedText}</Text>
+            <Text style={[styles.contentText]}><Markdown>{extractedText}</Markdown></Text>
           </View>
         )}
         
@@ -287,18 +354,22 @@ const renderDashboard = () => {
               />
               <Text style={[styles.cardTitle, { color: 'white' }]}>Medical Summary</Text>
             </View>
-            <Text style={[styles.contentText]}>{summary}</Text>
+            <Text style={[styles.contentText]}><Markdown>{summary}</Markdown></Text>
           </View>
         )}
       </View>
       
-      <TouchableOpacity style={styles.shareButton}>
+      {/* <TouchableOpacity style={styles.shareButton}>
         <MaterialIcons name="share" size={20} color="#fff" />
         <Text style={styles.shareButtonText}>Share Report</Text>
       </TouchableOpacity>
-      
+       */}
+       <TouchableOpacity style={styles.shareButton} onPress={saveReportToDownloads}>
+  {/* <MaterialIcons name="save" size={20} color="#fff" /> */}
+  <Text style={styles.shareButtonText}>Save Report</Text>
+</TouchableOpacity>
       <TouchableOpacity style={styles.newAnalysisButton} onPress={resetResults}>
-        <MaterialIcons name="add" size={20} color="#fff" />
+        {/* <MaterialIcons name="add" size={20} color="#fff" /> */}
         <Text style={styles.newAnalysisText}>New Analysis</Text>
       </TouchableOpacity>
     </View>
@@ -306,6 +377,10 @@ const renderDashboard = () => {
 };
 
   return (
+     <ImageBackground 
+          source={require('../assets/bg_health.jpg')} 
+          style={styles.backgroundImage}
+        >
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -396,7 +471,7 @@ const renderDashboard = () => {
                   </View>
                 ) : (
                   <>
-                    <MaterialIcons name="medical-services" size={20} color="#fff" />
+                    {/* <MaterialIcons name="medical-services" size={20} color="#fff" /> */}
                     <Text style={styles.buttonText}>Analyze Medical Conversation</Text>
                   </>
                 )}
@@ -408,6 +483,7 @@ const renderDashboard = () => {
         )}
       </ScrollView>
     </View>
+    </ImageBackground>
   );
 };
 
@@ -415,7 +491,12 @@ const renderDashboard = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'rgba(71, 255, 197, 0.3)',
+    // backgroundColor: 'rgba(71, 255, 197, 0.3)',
+  },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   header: {
     flexDirection: 'row',
@@ -445,13 +526,13 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   sectionTitle: {
-    color: '#000',
+    color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   sectionSubtitle: {
-    color: '#000',
+    color: '#fff',
     fontSize: 16,
     marginBottom: 25,
   },
@@ -465,15 +546,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   uploadLabel: {
-    color: '#000',
+    color: '#fff',
     fontSize: 14,
     marginBottom: 10,
     fontWeight: '500',
   },
   uploadBox: {
     height: 120,
-    borderWidth: 2,
-    borderColor: 'rgba(14, 15, 15, 0.93)',
+    // borderWidth: 2,
+    // borderColor: 'rgba(14, 15, 15, 0.93)',
     borderStyle: 'dashed',
     borderRadius: 12,
     justifyContent: 'center',

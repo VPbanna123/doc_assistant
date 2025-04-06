@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-// const { user, updateUserProfile, loading: authLoading } = useAuth();
+
 // Define types for profile data
 interface ProfileData {
   name: string;
@@ -26,8 +26,8 @@ const UpdateProfileScreen: React.FC = () => {
   const [formData, setFormData] = useState<ProfileData>({
     name: user?.name || '',
     email: user?.email || '',
-    phone: '',  // Assuming these might not be in your User type
-    bio: '',    // Assuming these might not be in your User type
+    phone: '',  
+    bio: '',    
   });
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -59,7 +59,7 @@ const UpdateProfileScreen: React.FC = () => {
       await updateUserProfile({
         name: formData.name,
         email: formData.email,
-        // Add other fields if your backend supports them
+        
       });
       
       // Show success feedback
