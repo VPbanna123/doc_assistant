@@ -202,7 +202,7 @@ const HomeScreen = ({ navigation, route }: { navigation: any, route: any }) => {
               <View style={styles.optionTextContainer}>
                 <Text style={styles.optionTitle}>Start Meeting</Text>
                 <Text style={styles.optionDescription}>
-                  Begin an online video conversation
+                  Begin recording meeting conversation
                 </Text>
               </View>
             </TouchableOpacity>

@@ -4,11 +4,11 @@ from whisper_transcribe import transcribe_audio
 from chatbot import chatbot_response
 from ocr_extraction import extract_text
 from summarizer import summarize_text
-from voice import voice_bp 
+# from voice import voice_bp 
 
 app = Flask(__name__)
 CORS(app)
-app.register_blueprint(voice_bp, url_prefix='/api/voice')
+# app.register_blueprint(voice_bp, url_prefix='/api/voice')
 
 # 1️⃣ Speech-to-text (Whisper)
 @app.route('/transcribe', methods=['POST'])
