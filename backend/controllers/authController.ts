@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../model/user';
 import dotenv from 'dotenv';
-
+import sendVerificationemail from "../utils/sendVErificationemail"
 dotenv.config();
 
 // Helper function for consistent error responses
@@ -44,6 +44,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       name,
       email,
       password: hashedPassword,
+      isVerified:false
     });
 
     await newUser.save();
@@ -55,6 +56,20 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       { expiresIn: '1d' }
     );
 
+    const email_token=jwt.sign(
+      {userId:newUser._id},
+      process.env.Email_Token_secret as string,
+      {expiresIn:"1d"}
+    )
+
+    const emailSent=await sendVerificationemail(newUser.email,newUser.name,email_token)
+    
+    if(!emailSent)
+    {
+       handleError(res, 500, "Failed to send verification email");
+    return 
+      }
+    
     // Send response with token and user data
     res.status(201).json({
       success: true,
@@ -92,10 +107,29 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      handleError(res, 400, 'Invalid credentials');
+      handleError(res, 400, 'Invalid password');
       return;
     }
 
+    if(!user.isVerified){
+     const email_token=jwt.sign(
+      {userId:user._id},
+      process.env.Email_Token_Secret as string,
+      {expiresIn:"1d"}
+     );
+     const emailSent=await sendVerificationemail(
+      user.email,
+      user.name,
+      email_token
+     )
+     if(!emailSent)
+     {
+      handleError(res, 500, "Failed to send verification email");
+      return 
+     }
+      handleError(res, 400, "Please verify your email first. We sent you a verification email.");
+  return;
+    }
     // Generate token with extended expiration
     const token = jwt.sign(
       { id: user._id, email: user.email },
@@ -108,7 +142,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       success: true,
       token,
       user: {
-        id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email
       }
@@ -119,6 +153,35 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+
+// verifying 
+export const VerifyEmail=async(req:Request,res:Response):Promise<void>=>{
+  try {
+    const token=req.query.token as string;
+    if(!token)
+    {
+      res.status(400).json({success:false,message:"Missing token"})
+   return;
+    }
+   const decoded=jwt.verify(token,process.env.Email_Token_secret as string ) as {userId:string};
+   const user=await User.findById(decoded.userId);
+   if(!user){
+    res.status(404).json({success:false,message:"user not found"})
+    return ;
+   }
+   if(user.isVerified ){
+res.status(400).json({success:false,message:"user is already verified"});
+return ;
+   }
+   user.isVerified=true;
+   await user.save();
+   res.send("<h2>Email verified successfully! 🎉 You can now log in.</h2>");
+
+  } catch (error) {
+    console.error("verify email error",error);
+    res.status(400).json({success:false,message:"inavlid or expired token"})
+  }
+}
 // Get current user profile
 export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
   try {

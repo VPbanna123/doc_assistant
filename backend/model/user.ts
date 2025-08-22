@@ -10,6 +10,7 @@ export interface IUser extends Document {
     filename: string;
     createdAt: Date;
   }>
+  isVerified:boolean
 }
 const HistoryItemSchema: Schema = new Schema({
   filename: { type: String, required: true },
@@ -22,7 +23,8 @@ const UserSchema: Schema = new Schema({
   password: { type: String, required: true },
   phone: { type: String },
   bio: { type: String },
-  history: [HistoryItemSchema]
+  history: [HistoryItemSchema],
+  isVerified: { type: Boolean, default: false },
 });
 
 export default mongoose.model<IUser>('User', UserSchema);
