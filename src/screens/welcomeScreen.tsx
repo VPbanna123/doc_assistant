@@ -1,27 +1,46 @@
+
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, ImageBackground } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform } from "react-native";
 
 const WelcomeScreen = ({ navigation }: { navigation: any }) => {
   // Create animated values
-  const rotation = useRef(new Animated.Value(0)).current;
   const subtitleOpacity = useRef(new Animated.Value(0)).current;
   const subtitleScale = useRef(new Animated.Value(0.9)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const logoRotate = useRef(new Animated.Value(0)).current;
+  const navbarLogoRotate = useRef(new Animated.Value(0)).current; // Separate rotation for navbar logo
   
   // For word-by-word animation
-  const welcomeWords = "Welcome to Our App!".split(" ");
+  const welcomeWords = "Welcome to DocuAI!".split(" ");
   const wordAnimations = useRef(
     welcomeWords.map(() => new Animated.Value(0))
   ).current;
 
   useEffect(() => {
-    // Logo rotation animation
+    // Page fade in
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+
+    // Logo rotation animation (for the body logo)
     Animated.loop(
-      Animated.timing(rotation, {
+      Animated.timing(logoRotate, {
         toValue: 1,
         duration: 2000,
         useNativeDriver: true,
       }),
       { iterations: -1 }
+    ).start();
+
+    // Navbar logo rotation animation
+    Animated.loop(
+      Animated.timing(navbarLogoRotate, {
+        toValue: 1,
+        duration: 4000, // Different speed for navbar logo
+        useNativeDriver: true,
+      })
     ).start();
     
     // Word-by-word animation
@@ -71,22 +90,33 @@ const WelcomeScreen = ({ navigation }: { navigation: any }) => {
     };
   }, []);
 
-  const rotateInterpolate = rotation.interpolate({
+  const logoRotateInterpolate = logoRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  const navbarLogoRotateInterpolate = navbarLogoRotate.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
 
   return (
-    <ImageBackground 
-      source={require('../assets/bg_health.jpg')} 
-      style={styles.backgroundImage}
-    >
-      <View style={styles.container}>
-        {/* Header */}
+    <View style={styles.container}>
+      <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
+        {/* Header with same styling as other pages */}
         <View style={styles.header}>
+          <View style={styles.headerGradient} />
+          
           <View style={styles.logoContainer}>
-            <Image source={require('../assets/logo_health.jpg')} style={styles.logo} />
+            <Animated.Image 
+              source={require('../assets/logo_health.jpg')} 
+              style={[
+                styles.logo,
+                { transform: [{ rotate: navbarLogoRotateInterpolate }] }
+              ]} 
+            />
           </View>
+          
           <View style={styles.buttonsContainer}>
             <TouchableOpacity
               style={[styles.button, styles.loginButton]}
@@ -106,7 +136,7 @@ const WelcomeScreen = ({ navigation }: { navigation: any }) => {
         {/* Main Content with Animated Text */}
         <View style={styles.mainContent}>
           {/* Word-by-word animated welcome text */}
-          <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center'}}>
+          <View style={styles.welcomeTextWrapper}>
             {welcomeWords.map((word, index) => (
               <Animated.Text
                 key={index}
@@ -128,26 +158,25 @@ const WelcomeScreen = ({ navigation }: { navigation: any }) => {
                         })
                       }
                     ],
-                    marginRight: 8, 
                   }
                 ]}
               >
-                {word}
+                {word}{' '}
               </Animated.Text>
             ))}
           </View>
-          
-      
         </View>
 
-        {/* React Native Logo Animation */}
-        <View style={styles.reactLogoWrapper}>
+        {/* Spacer between text and logo */}
+        <View style={styles.spacer} />
+
+        {/* React Native Logo Animation - Proper positioning in flow */}
+        <View style={styles.logoSection}>
           <Animated.View
-            style={{
-              width: 80,
-              height: 80,
-              transform: [{ rotate: rotateInterpolate }],
-            }}
+            style={[
+              styles.reactLogoContainer,
+              { transform: [{ rotate: logoRotateInterpolate }] }
+            ]}
           >
             <Image
               source={require('../assets/logo_health.jpg')}
@@ -156,50 +185,74 @@ const WelcomeScreen = ({ navigation }: { navigation: any }) => {
           </Animated.View>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>© 2025 DocuAI </Text>
+        {/* Spacer between logo and footer */}
+        <View style={styles.spacer} />
+
+      </Animated.View>
+      
+      {/* Footer */}
+      <View style={styles.footer}>
+        <View style={styles.footerContent}>
+          <Text style={styles.footerText}>© 2025 DocuAI</Text>
         </View>
       </View>
-    </ImageBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  backgroundImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
   container: {
     flex: 1,
-    backgroundColor: "transparent", 
-    justifyContent: "space-between",
-    alignItems: "center",
+    backgroundColor: '#f8fafc', // Same as other pages
   },
+
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+
+  // Header with same styling as other pages
   header: {
     width: "100%",
-    height: 70, 
+    height: 80,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 0, 
+    paddingTop: Platform.OS === 'ios' ? 30 : 0,
     paddingHorizontal: 20,
+    position: 'relative',
+    overflow: 'hidden',
   },
+
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#3b82f6', // Same medical blue
+    opacity: 0.95,
+  },
+
   logoContainer: {
     justifyContent: "center",
     alignItems: "flex-start",
+    zIndex: 1,
   },
+
   logo: {
     width: 50,
     height: 50,
     resizeMode: "cover",
-    borderRadius: 25, 
+    borderRadius: 25,
   },
+
   buttonsContainer: {
     flexDirection: "row",
     alignItems: "center",
+    zIndex: 1,
   },
+
   button: {
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -207,72 +260,103 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
     shadowOpacity: 0.27,
     shadowRadius: 4.65,
     elevation: 6,
   },
+
   loginButton: {
-    backgroundColor: "#FFB74D",
+   backgroundColor: "#b310b9ff", 
+    // borderWidth: 1,
+    // borderColor: 'rgba(255, 255, 255, 0.3)',
   },
+
   signupButton: {
-    backgroundColor: "#4CAF89",
+    backgroundColor: "#10b981", // Same green as other pages
   },
+
   buttonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600", // Changed from bold to 600
   },
+
   mainContent: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    width: "100%",
     paddingHorizontal: 25,
   },
+
+  welcomeTextWrapper: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   welcomeText: {
     fontSize: 36,
-    fontWeight: "bold",
-    color: "#fff",
+    fontWeight: "800", // Changed from bold to 800
+    color: "#1f2937", // Dark gray color matching other pages
     textAlign: "center",
-    textShadowColor: 'rgba(0, 0, 0, 0.6)',
-    textShadowOffset: {width: 0, height: 2},
-    textShadowRadius: 8,
+    marginRight: 8,
+    marginBottom: 4,
   },
-  subText: {
-    fontSize: 18,
-    color: "#F5F5F5",
-    marginBottom: 30,
-    textAlign: "center",
-    lineHeight: 26,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: {width: 0, height: 1},
-    textShadowRadius: 3,
+
+  // Spacer for vertical spacing
+  spacer: {
+    height: 60, // Adjust this value to control spacing
   },
-  reactLogoWrapper: {
-    position: "absolute",
-    bottom: 150,
+
+  // Logo section - positioned in document flow
+  logoSection: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+
+  reactLogoContainer: {
+    width: 80,
+    height: 80,
     justifyContent: "center",
     alignItems: "center",
   },
+
   reactLogo: {
     width: 80,
     height: 80,
     resizeMode: "cover",
     borderRadius: 40,
   },
+
+  // Footer - Fixed centering
   footer: {
     width: "100%",
-    padding: 15,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Same as other pages
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.07)",
+    borderTopColor: '#e5e7eb', // Same as other pages
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    justifyContent: 'center', // Center the footer content
+    alignItems: 'center', // Center the footer content
   },
+
+  footerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%', // Take full width
+  },
+
   footerText: {
-    color: "#E0E0E0",
+    color: '#6b7280', // Same gray as other pages
     fontSize: 14,
+    fontWeight: '500', // Same weight as other pages
+    textAlign: 'center', // Center the text
   },
 });
 

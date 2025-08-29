@@ -51,13 +51,16 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
     
     setIsLoading(true);
     try {
-      await sendPasswordResetEmail(email);
+       const data = await sendPasswordResetEmail(email);
+    
+    // If the API returns success (you can also check data.message or a success flag if available)
+    if (data) {
       Alert.alert(
-        'Success', 
+        'Success',
         'Password reset instructions have been sent to your email',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+        [{ text: 'OK', onPress: () => navigation.navigate('VerifyOtp', { email }) }]
       );
-    } catch (error: any) {
+    } }catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to send reset email');
     } finally {
       setIsLoading(false);

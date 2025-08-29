@@ -1,8 +1,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import App from '../App';
 
-const API_URL = "http://localhost:5000/api/auth";
-const USER_API_URL = "http://localhost:5000/api/user";
+const API_URL = "https://doc-assistant-sa93.onrender.com/api/auth";
+
 
 // Define TypeScript interfaces
 export interface User {
@@ -12,23 +13,65 @@ export interface User {
 }
 
 export interface AuthResponse {
+success: boolean;
+message:string
   token: string;
   user: User;
 }
 
 // Helper function for API calls
+
 const handleApiResponse = async <T>(response: Response): Promise<T> => {
-  const data = await response.json();
+  // const text = await response.text();
+  const data=await response.json().catch(()=>null);
+
   if (!response.ok) {
-    throw new Error(data.message || "API request failed");
+    // You can log or throw a more detailed error
+    // throw new Error(`API error: ${response.status} - ${text}`);
+    throw new Error(data?.message || `error ${response.status}`)
   }
-  return data as T;
+
+  // Try to parse JSON, otherwise throw
+  try {
+    // return JSON.parse(text) as T;
+    return data as T;
+  } catch (e) {
+    // throw new Error(`Failed to parse JSON: ${text}`);
+    throw new Error("Failed to parse JSON response");
+  }
+};
+// Store both token and user
+export const storeAuth = async (auth: AuthResponse): Promise<void> => {
+  try {
+    await AsyncStorage.setItem('authData', JSON.stringify(auth));
+  } catch (error) {
+    console.error('Error storing auth data', error);
+    throw new Error('Failed to store authentication data');
+  }
+};
+
+export const getAuth = async (): Promise<AuthResponse | null> => {
+  try {
+    const data = await AsyncStorage.getItem('authData');
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error('Error retrieving auth data', error);
+    return null;
+  }
+};
+
+export const removeAuth = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem('authData');
+  } catch (error) {
+    console.error('Error removing auth data', error);
+  }
 };
 
 // Store auth token
 export const storeToken = async (token: string): Promise<void> => {
   try {
-    await AsyncStorage.setItem('authToken', JSON.stringify(token));
+    await AsyncStorage.setItem('authToken', token);
   } catch (error) {
     console.error('Error storing auth token', error);
     throw new Error('Failed to store authentication token');
@@ -67,20 +110,55 @@ export const signUp = async (name: string, email: string, password: string): Pro
 
 // Log in function
 export const logIn = async (email: string, password: string): Promise<AuthResponse> => {
-  const response = await fetch(`${API_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const data = await handleApiResponse<AuthResponse>(response);
+  try {
+    const response = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
   
-  // Store the token automatically upon successful login
-  await storeToken(data.token);
-  
-  return data;
+    const data = await handleApiResponse<AuthResponse>(response);
+    
+    // Store the token automatically upon successful login
+    await storeToken(data.token);
+      const storedToken = await getToken();
+    console.log('Token after login:', storedToken);
+    if (!storedToken) throw new Error("Token storage failed");
+    return data;
+  } catch (error:any) {
+    throw error;
+  }
 };
 
+export const verifyOtp=async(email:string,otp:string):Promise<AuthResponse>=>{
+  try {
+      const response=await fetch(`${API_URL}/verifyotp`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email,otp})
+      });
+
+      const data=await handleApiResponse<AuthResponse>(response);
+      return data;
+
+  } catch (error:any) {
+    throw error;
+  }
+}
+
+export const resetPassword=async(email:string,password:string):Promise<AuthResponse>=>{
+  try {
+    const response=await fetch(`${API_URL}/resetPassword`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email,newPassword: password})
+    });
+    const data=await handleApiResponse<AuthResponse>(response)
+   return data;
+  } catch (error:any) {
+    throw error
+  }
+}
 // Log out function
 export const logOut = async (): Promise<void> => {
   await removeToken();
@@ -94,15 +172,19 @@ export const getCurrentUser = async (): Promise<User> => {
     throw new Error('Not authenticated');
   }
   
-  const response = await fetch(`${USER_API_URL}/profile`, {
+  const response = await fetch(`${API_URL}/profile`, {
     method: "GET",
     headers: {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json"
     }
   });
-  
-  return handleApiResponse<User>(response);
+    if (!response.ok) {
+    throw new Error("Failed to fetch user");
+  }
+ 
+ const data = await response.json(); // parse JSON
+  return data.user; 
 };
 
 // Update user profile
@@ -113,7 +195,7 @@ export const updateProfile = async (updates: Partial<User>): Promise<User> => {
     throw new Error('Not authenticated');
   }
   
-  const response = await fetch(`${USER_API_URL}/profile`, {
+  const response = await fetch(`${API_URL}/update-profile`, {
     method: "PUT",
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -151,9 +233,9 @@ export const isAuthenticated = async (): Promise<boolean> => {
   return !!token;
 };
 
-export const sendPasswordResetEmail = async (email: string): Promise<void> => {
+export const sendPasswordResetEmail = async (email: string): Promise<any> => {
   try {
-    const response = await fetch(`${API_URL}/auth/forgot-password`, {
+    const response = await fetch(`${API_URL}/forgot-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -174,25 +256,3 @@ export const sendPasswordResetEmail = async (email: string): Promise<void> => {
   }
 };
 
-export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
-  try {
-    const response = await fetch(`${API_URL}/auth/reset-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token, newPassword }),
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to reset password');
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error('Password reset error:', error);
-    throw new Error(error.message || 'Failed to reset password');
-  }
-};

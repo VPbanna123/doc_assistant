@@ -12,6 +12,9 @@ import {
     AuthResponse,
     sendPasswordResetEmail, 
     resetPassword,
+    storeAuth,
+    removeAuth,
+    getAuth
   } from '../services/authService';
   
   // Re-export interfaces
@@ -31,5 +34,8 @@ import {
     getToken ,
     sendPasswordResetEmail, 
     resetPassword,
+    storeAuth,
+    removeAuth,
+getAuth
   };
   

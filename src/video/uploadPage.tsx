@@ -1,6 +1,6 @@
-import { FileSystem, Dirs } from 'react-native-file-access';
 
-import React, { useState } from 'react';
+import { FileSystem, Dirs } from 'react-native-file-access';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,21 +10,21 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Animated,
+  Easing,
   Image,
-  ImageBackground
 } from 'react-native';
 import { pick, types, errorCodes, isErrorWithCode } from '@react-native-documents/picker';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import { StackNavigationProp } from '@react-navigation/stack';
-// import Arrow from '../assets/arrow.svg';
 import RNFS from 'react-native-fs';
-import {  PermissionsAndroid } from 'react-native';
+import { PermissionsAndroid } from 'react-native';
 import Markdown from "react-native-markdown-display";
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 // Define API endpoints
-const API_BASE_URL = 'http://127.0.0.1:5002';
-const history_url='http://127.0.0.1:5000/save-history'
+const API_BASE_URL = "http://127.0.0.1:5002";
+const history_url = 'http://127.0.0.1:5000/save-history';
 const FULL_WORKFLOW_URL = `${API_BASE_URL}/full-workflow`;
 
 // Navigation Props
@@ -32,6 +32,7 @@ type RootStackParamList = {
   Home: undefined;
   UploadPage: undefined;
 };
+
 type UploadPageProps = {
   navigation: StackNavigationProp<RootStackParamList>;
 };
@@ -44,6 +45,22 @@ interface DocumentFile {
   size: number;
 }
 
+// Language options
+const LANGUAGE_OPTIONS = [
+  { code: 'en', name: 'English' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'hi', name: 'Hindi' },
+];
+
 const UploadPage = ({ navigation }: UploadPageProps) => {
   const [audioFile, setAudioFile] = useState<DocumentFile | null>(null);
   const [imageFile, setImageFile] = useState<DocumentFile | null>(null);
@@ -53,7 +70,50 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
   const [extractedText, setExtractedText] = useState('');
   const [summary, setSummary] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [activeTab, setActiveTab] = useState('transcript');
+  
+  // Language selection state
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const logoRotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Continuous logo rotation
+    Animated.loop(
+      Animated.timing(logoRotate, {
+        toValue: 1,
+        duration: 4000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: uploadProgress,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [uploadProgress]);
 
   // Pick Audio/Video Document
   const pickAudioDocument = async () => {
@@ -64,11 +124,12 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
       });
 
       if (result.length > 0) {
+        const file = result[0];
         const selectedFile: DocumentFile = {
-          uri: result[0].uri,
-          type: result[0].type || 'application/octet-stream',
-          name: result[0].name || 'unknown_file',
-          size: result[0].size ?? 0,
+          uri: file.uri,
+          type: file.type || 'application/octet-stream',
+          name: file.name || 'unknown_file',
+          size: file.size ?? 0,
         };
         setAudioFile(selectedFile);
         resetResults();
@@ -87,11 +148,12 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
       });
 
       if (result.length > 0) {
+        const file = result[0];
         const selectedFile: DocumentFile = {
-          uri: result[0].uri,
-          type: result[0].type || 'application/octet-stream',
-          name: result[0].name || 'unknown_file',
-          size: result[0].size ?? 0,
+          uri: file.uri,
+          type: file.type || 'application/octet-stream',
+          name: file.name || 'unknown_file',
+          size: file.size ?? 0,
         };
         setImageFile(selectedFile);
       }
@@ -125,31 +187,64 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
     setAnalysis('');
     setExtractedText('');
     setSummary('');
-    setActiveTab('transcript');
   };
-  // const saveProcessingHistory = async (audioFile: File|null, imageFile: File | null) => {
-  //   try {
-  //     const historyData = {
-  //       audioFile,
-  //       imageFile,
-  //       processedAt: new Date().toISOString()
-  //     };
-  
-  //     const response = await axios.post(history_url, historyData, {
-  //       headers: { 'Content-Type': 'application/json' }
-  //     });
-  
-  //     if (response.data.success) {
-  //       console.log('Processing history saved successfully');
-  //     } else {
-  //       console.error('Failed to save processing history');
-  //     }
-  //   } catch (error) {
-  //     console.error('Error saving processing history:', error);
-  //     Alert.alert('History Save Error', 'Failed to save processing history. Please try again.');
-  //   }
-  // };
-  
+
+  // Language selection functions
+  const renderLanguageSelector = () => {
+    const selectedLang = LANGUAGE_OPTIONS.find(lang => lang.code === selectedLanguage);
+    
+    return (
+      <View style={styles.languageSection}>
+        <Text style={styles.sectionLabel}>🌐 Analysis Language</Text>
+        <TouchableOpacity 
+          style={styles.languageSelector} 
+          onPress={() => setShowLanguageDropdown(!showLanguageDropdown)}
+        >
+          <View style={styles.languageSelectorContent}>
+            <Text style={styles.selectedLanguageText}>
+              {selectedLang?.name || 'English'}
+            </Text>
+            <MaterialIcons 
+              name={showLanguageDropdown ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
+              size={24} 
+              color="#6b7280" 
+            />
+          </View>
+        </TouchableOpacity>
+        
+        {showLanguageDropdown && (
+          <View style={styles.languageDropdown}>
+            <ScrollView style={styles.languageList} nestedScrollEnabled>
+              {LANGUAGE_OPTIONS.map((language) => (
+                <TouchableOpacity
+                  key={language.code}
+                  style={[
+                    styles.languageOption,
+                    selectedLanguage === language.code && styles.selectedLanguageOption
+                  ]}
+                  onPress={() => {
+                    setSelectedLanguage(language.code);
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.languageOptionText,
+                    selectedLanguage === language.code && styles.selectedLanguageOptionText
+                  ]}>
+                    {language.name}
+                  </Text>
+                  {selectedLanguage === language.code && (
+                    <MaterialIcons name="check" size={20} color="#3b82f6" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   // Process Files through Full Workflow
   const processFiles = async () => {
     if (!audioFile) {
@@ -179,7 +274,8 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
         } as any);
       }
 
-      // await saveProcessingHistory(audioFile, imageFile);
+      // Add selected language to the request
+      formData.append('language', selectedLanguage);
 
       // Call full workflow endpoint
       const response = await axios.post(FULL_WORKFLOW_URL, formData, {
@@ -203,18 +299,15 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
         setSummary(response.data.summary);
       }
    
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing files:', error);
       let errorMessage = 'Failed to process your files. Please try again.';
       
-      // Get more specific error information
       if (error.response) {
-        // The server responded with a status code outside the 2xx range
         console.error('Error data:', error.response.data);
         console.error('Error status:', error.response.status);
         errorMessage = error.response.data.error || errorMessage;
       } else if (error.request) {
-        // The request was made but no response was received
         console.error('No response received:', error.request);
         errorMessage = 'Server not responding. Check your connection.';
       }
@@ -227,478 +320,634 @@ const UploadPage = ({ navigation }: UploadPageProps) => {
     }
   };
 
-// Add this function to your component
+  const saveReportToDownloads = async () => {
+    const reportContent = `MEDICAL REPORT\n\n` +
+      `AI ANALYSIS:\n${analysis}`;
+    
+    try {
+      const fileName = `MedicalAnalysis_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+      const tempPath = `${Dirs.DocumentDir}/${fileName}`;
+      
+      await FileSystem.writeFile(tempPath, reportContent, 'utf8');
+      await FileSystem.cpExternal(tempPath, fileName, 'downloads');
+      
+      Alert.alert(
+        "Report Saved",
+        `Your analysis has been saved to Downloads as "${fileName}"`,
+        [{ text: "OK" }]
+      );
+      
+      console.log('Report saved successfully');
+    } catch (error) {
+      console.error('Error saving report:', error);
+      Alert.alert("Save Failed", "Could not save the analysis. Please try again.");
+    }
+  };
 
-const saveReportToDownloads = async () => {
-  // Create report content
-  const reportContent = `MEDICAL REPORT\n\n` +
-    `TRANSCRIPT:\n${transcript}\n\n` +
-    `ANALYSIS:\n${analysis}\n\n` +
-    (extractedText ? `EXTRACTED TEXT:\n${extractedText}\n\n` : '') +
-    (summary ? `SUMMARY:\n${summary}` : '');
-  
-  try {
-    // First save to app's document directory
-    const fileName = `MedicalReport_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
-    const tempPath = `${Dirs.DocumentDir}/${fileName}`;
-    
-    // Write the file to document directory
-    await FileSystem.writeFile(tempPath, reportContent, 'utf8');
-    
-    // Then copy to external downloads folder
-    await FileSystem.cpExternal(tempPath, fileName, 'downloads');
-    
-    // Show success message
-    Alert.alert(
-      "Report Saved",
-      `Your report has been saved to Downloads as "${fileName}"`,
-      [{ text: "OK" }]
+  // Modified dashboard to show only analysis
+  const renderDashboard = () => {
+    return (
+      <Animated.View style={[styles.dashboardContainer, { opacity: fadeAnim }]}>
+        <View style={styles.contentContainer}>
+          <ContentCard title="AI Medical Analysis" content={analysis} />
+        </View>
+        
+        <TouchableOpacity onPress={saveReportToDownloads} style={styles.saveButton}>
+          <MaterialIcons name="download" size={20} color="#fff" />
+          <Text style={styles.saveButtonText}>Save Analysis</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={resetResults} style={styles.newAnalysisButton}>
+          <MaterialIcons name="refresh" size={20} color="#fff" />
+          <Text style={styles.newAnalysisText}>New Analysis</Text>
+        </TouchableOpacity>
+      </Animated.View>
     );
-    
-    console.log('Report saved successfully');
-  } catch (error) {
-    console.error('Error saving report:', error);
-    Alert.alert("Save Failed", "Could not save the report. Please try again.");
-  }
-};
+  };
 
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
- 
-const renderDashboard = () => {
-  return (
-    <View style={[styles.dashboardContainer, { backgroundColor: 'white' }]}>
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'transcript' && styles.activeTab]} 
-          onPress={() => setActiveTab('transcript')}
-        >
-          {/* <MaterialIcons name="record-voice-over" size={20} color={activeTab === 'transcript' ? '#fff' : '#aaa'} /> */}
-          <Text style={[styles.tabText, activeTab === 'transcript' && styles.activeTabText]}>Transcript</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'analysis' && styles.activeTab]} 
-          onPress={() => setActiveTab('analysis')}
-        >
-          {/* <MaterialIcons name="analytics" size={20} color={activeTab === 'analysis' ? '#fff' : '#aaa'} /> */}
-          <Text style={[styles.tabText, activeTab === 'analysis' && styles.activeTabText]}>Analysis</Text>
-        </TouchableOpacity>
-        
-        {extractedText && (
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'ocr' && styles.activeTab]} 
-            onPress={() => setActiveTab('ocr')}
-          >
-            {/* <MaterialIcons name="document-scanner" size={20} color={activeTab === 'ocr' ? '#fff' : '#aaa'} /> */}
-            <Text style={[styles.tabText, activeTab === 'ocr' && styles.activeTabText]}>OCR</Text>
-          </TouchableOpacity>
-        )}
-        
-        {summary && (
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'summary' && styles.activeTab]} 
-            onPress={() => setActiveTab('summary')}
-          >
-            {/* <MaterialIcons name="summarize" size={20} color={activeTab === 'summary' ? '#fff' : '#aaa'} /> */}
-            <Text style={[styles.tabText, activeTab === 'summary' && styles.activeTabText]}>Summary</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      
-      <View style={styles.contentContainer}>
-        {activeTab === 'transcript' && (
-          <View style={[styles.contentCard, { backgroundColor: 'white' }]}>
-            <View style={styles.cardHeader}>
-              <Image 
-                source={require('../assets/arrow.svg')} 
-                style={{ width: 24, height: 24 }} 
-              />
-              <Text style={[styles.cardTitle, { color: 'white' }]}>Medical Transcript</Text>
-            </View>
-            <Text style={[styles.contentText]}><Markdown>{transcript}</Markdown></Text>
-          </View>
-        )}
-        
-        {activeTab === 'analysis' && (
-          <View style={[styles.contentCard, { backgroundColor: 'white' }]}>
-            <View style={styles.cardHeader}>
-              <Image 
-                source={require('../assets/arrow.svg')} 
-                style={{ width: 24, height: 24 }} 
-              />
-              <Text style={[styles.cardTitle, { color: 'white' }]}>AI Analysis</Text>
-            </View>
-            <Text style={[styles.contentText]}><Markdown>{analysis}</Markdown></Text>
-          </View>
-        )}
-        
-        {activeTab === 'ocr' && extractedText && (
-          <View style={[styles.contentCard, { backgroundColor: 'white' }]}>
-            <View style={styles.cardHeader}>
-              <Image 
-                source={require('../assets/arrow.svg')} 
-                style={{ width: 24, height: 24 }} 
-              />
-              <Text style={[styles.cardTitle, { color: 'white' }]}>Extracted Text</Text>
-            </View>
-            <Text style={[styles.contentText]}><Markdown>{extractedText}</Markdown></Text>
-          </View>
-        )}
-        
-        {activeTab === 'summary' && summary && (
-          <View style={[styles.contentCard, { backgroundColor: 'white' }]}>
-            <View style={styles.cardHeader}>
-              <Image 
-                source={require('../assets/arrow.svg')} 
-                style={{ width: 24, height: 24 }} 
-              />
-              <Text style={[styles.cardTitle, { color: 'white' }]}>Medical Summary</Text>
-            </View>
-            <Text style={[styles.contentText]}><Markdown>{summary}</Markdown></Text>
-          </View>
-        )}
-      </View>
-      
-      {/* <TouchableOpacity style={styles.shareButton}>
-        <MaterialIcons name="share" size={20} color="#fff" />
-        <Text style={styles.shareButtonText}>Share Report</Text>
-      </TouchableOpacity>
-       */}
-       <TouchableOpacity style={styles.shareButton} onPress={saveReportToDownloads}>
-  {/* <MaterialIcons name="save" size={20} color="#fff" /> */}
-  <Text style={styles.shareButtonText}>Save Report</Text>
-</TouchableOpacity>
-      <TouchableOpacity style={styles.newAnalysisButton} onPress={resetResults}>
-        {/* <MaterialIcons name="add" size={20} color="#fff" /> */}
-        <Text style={styles.newAnalysisText}>New Analysis</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
+  const logoRotateInterpolate = logoRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   return (
-     <ImageBackground 
-          source={require('../assets/bg_health.jpg')} 
-          style={styles.backgroundImage}
-        >
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Image 
-                source={require('../assets/arrow.png')} 
-                style={{ width: 24, height: 24 ,zIndex: 1 ,position: 'relative',}} 
-              />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {transcript ? 'Medical Analysis' : 'Upload Media'}
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        {/* Enhanced Navbar with Gradient */}
+        <View style={styles.header}>
+          <View style={styles.headerGradient} />
+          
+          {/* MaterialIcon Back Button */}
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>
+              {analysis ? 'Medical Analysis' : 'Medical AI Assistant'}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {analysis ? 'Review your analysis' : 'Upload files for analysis'}
+            </Text>
+          </View>
+          
+          {/* Keep Your App Logo Rotating */}
+          <View style={styles.headerLogoContainer}>
+            <Animated.Image 
+              source={require('../assets/logo_health.jpg')} 
+              style={[
+                styles.rotatingLogo,
+                { transform: [{ rotate: logoRotateInterpolate }] }
+              ]} 
+            />
+          </View>
+        </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {!transcript ? (
-          <View style={styles.uploadSection}>
-            <Text style={styles.sectionTitle}>Medical AI Assistant</Text>
-            <Text style={styles.sectionSubtitle}>Upload audio/video of doctor-patient conversation for AI analysis</Text>
-
-            <View style={styles.uploadContainer}>
-              <View style={styles.uploadColumn}>
-                <Text style={styles.uploadLabel}>Audio/Video File (Required)</Text>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          {!analysis ? (
+            <Animated.View style={[
+              styles.uploadSection,
+              { 
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}>
+              
+              {/* Language Selection */}
+              {renderLanguageSelector()}
+              
+              {/* Audio File Upload - Compact */}
+              <View style={styles.fileSection}>
+                <Text style={styles.sectionLabel}>🎵 Audio/Video File</Text>
                 <TouchableOpacity 
                   style={[styles.uploadBox, audioFile && styles.uploadBoxSelected]} 
                   onPress={pickAudioDocument} 
                   disabled={isProcessing}
                 >
-                  {/* <MaterialIcons 
-                    name={audioFile ? (audioFile.type?.includes('video') ? "videocam" : "audiotrack") : "cloud-upload"} 
-                    size={40} 
-                    color={audioFile ? "#32CD32" : "#FF6347"} 
-                  /> */}
-                  <Image 
-      source={require('../assets/video.jpg')} 
-      style={{ width: 40, height: 40, zIndex: 1 }} 
-    />
-                  <Text style={[styles.uploadText, audioFile && styles.uploadTextSelected]}>
-                    {audioFile ? 'Change file' : 'Select audio/video'}
-                  </Text>
-                </TouchableOpacity>
-                {audioFile && (
-                  <View style={styles.fileInfoCard}>
-                    <Text style={styles.fileName} numberOfLines={1}>{audioFile.name}</Text>
-                    <Text style={styles.fileInfo}>
-                      {audioFile.size ? `${(audioFile.size / 1024 / 1024).toFixed(2)} MB` : ''} • {audioFile.type.split('/')[0]}
-                    </Text>
+                  <View style={styles.uploadContent}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="audiotrack" size={24} color="#6b7280" />
+                    </View>
+                    <View style={styles.textContainer}>
+                      <Text style={[styles.uploadText, audioFile && styles.uploadTextSelected]}>
+                        {audioFile ? audioFile.name : 'Select audio or video file'}
+                      </Text>
+                      {audioFile && (
+                        <Text style={styles.fileSize}>
+                          {audioFile.size ? `${(audioFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                        </Text>
+                      )}
+                    </View>
+                    {audioFile && (
+                      <View style={styles.checkmark}>
+                        <MaterialIcons name="check" size={16} color="#fff" />
+                      </View>
+                    )}
                   </View>
-                )}
+                </TouchableOpacity>
               </View>
-              
-              <View style={styles.uploadColumn}>
-                <Text style={styles.uploadLabel}>Medical Report Image (Optional)</Text>
+
+              {/* Image File Upload - Compact */}
+              <View style={styles.fileSection}>
+                <Text style={styles.sectionLabel}>📄 Medical Document <Text style={styles.optional}>(Optional)</Text></Text>
                 <TouchableOpacity 
                   style={[styles.uploadBox, imageFile && styles.uploadBoxSelected]} 
                   onPress={pickImageDocument} 
                   disabled={isProcessing}
                 >
-                    <Image 
-      source={require('../assets/upload.jpeg')} 
-      style={{ width: 40, height: 40, zIndex: 1 }} 
-    />
-                  <Text style={[styles.uploadText, imageFile && styles.uploadTextSelected]}>
-                    {imageFile ? 'Change image' : 'Add medical report'}
-                  </Text>
+                  <View style={styles.uploadContent}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="description" size={24} color="#6b7280" />
+                    </View>
+                    <View style={styles.textContainer}>
+                      <Text style={[styles.uploadText, imageFile && styles.uploadTextSelected]}>
+                        {imageFile ? imageFile.name : 'Select medical document'}
+                      </Text>
+                      {imageFile && (
+                        <Text style={styles.fileSize}>
+                          {imageFile.size ? `${(imageFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                        </Text>
+                      )}
+                    </View>
+                    {imageFile && (
+                      <View style={styles.checkmark}>
+                        <MaterialIcons name="check" size={16} color="#fff" />
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
-                {imageFile && (
-                  <View style={styles.fileInfoCard}>
-                    <Text style={styles.fileName} numberOfLines={1}>{imageFile.name}</Text>
-                    <Text style={styles.fileInfo}>
-                      {imageFile.size ? `${(imageFile.size / 1024 / 1024).toFixed(2)} MB` : ''} • Image
-                    </Text>
-                  </View>
-                )}
               </View>
-            </View>
 
-            {audioFile && (
-              <TouchableOpacity 
-                style={styles.processButton} 
-                onPress={processFiles} 
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <View style={styles.progressContainer}>
-                    <ActivityIndicator color="#fff" size="small" style={styles.progressIndicator} />
-                    <Text style={styles.buttonText}>Processing...</Text>
-                  </View>
-                ) : (
-                  <>
-                    {/* <MaterialIcons name="medical-services" size={20} color="#fff" /> */}
-                    <Text style={styles.buttonText}>Analyze Medical Conversation</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          renderDashboard()
-        )}
-      </ScrollView>
+              {/* Process Button */}
+              {audioFile && (
+                <View style={styles.processSection}>
+                  <TouchableOpacity 
+                    style={styles.processButton} 
+                    onPress={processFiles} 
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <View style={styles.processingContainer}>
+                        <ActivityIndicator color="#fff" size="small" />
+                        <Text style={styles.processButtonText}>Processing...</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.processingContainer}>
+                        <MaterialIcons name="psychology" size={20} color="#fff" />
+                        <Text style={styles.processButtonText}>Start AI Analysis</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  
+                  {isProcessing && (
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressBar}>
+                        <Animated.View style={[
+                          styles.progressFill,
+                          { width: progressWidth }
+                        ]} />
+                      </View>
+                      <Text style={styles.progressText}>Analyzing your files...</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Animated.View>
+          ) : (
+            renderDashboard()
+          )}
+        </ScrollView>
+      </Animated.View>
     </View>
-    </ImageBackground>
   );
 };
 
+// Simple Content Card Component
+const ContentCard: React.FC<{
+  title: string;
+  content: string;
+}> = ({ title, content }) => {
+  return (
+    <View style={styles.contentCard}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <ScrollView style={styles.cardContent} nestedScrollEnabled>
+        <Text style={styles.contentText}>
+          <Markdown>{content}</Markdown>
+        </Text>
+      </ScrollView>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor: 'rgba(71, 255, 197, 0.3)',
+    backgroundColor: '#f8fafc', // Soft healthcare background
   },
-  backgroundImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
+
+  // Enhanced Header with Gradient
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 50 : 25,
-    paddingBottom: 15,
+    paddingVertical: 15,
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(28, 123, 192, 0.75)',
+    paddingTop: Platform.OS === 'ios' ? 50 : 15,
+    position: 'relative',
+    overflow: 'hidden',
   },
+
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#3b82f6', // Medical blue gradient
+    opacity: 0.95,
+  },
+
+  // Custom Back Button
   backButton: {
-    padding: 5,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: 1,
   },
+
+  headerContent: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 15,
+    zIndex: 1,
+  },
+
   headerTitle: {
-    color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
   },
+
+  headerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+
+  // Rotating Logo Container
+  headerLogoContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: 1,
+    overflow: 'hidden',
+  },
+
+  rotatingLogo: {
+    width: 32, // Logo size inside the container
+    height: 32,
+    borderRadius: 16,
+  },
+
   scrollView: {
     flex: 1,
   },
+
   scrollContent: {
     padding: 20,
     paddingBottom: 40,
   },
+
   uploadSection: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  sectionSubtitle: {
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 25,
-  },
-  uploadContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  uploadColumn: {
     flex: 1,
-    marginHorizontal: 5,
   },
-  uploadLabel: {
-    color: '#fff',
-    fontSize: 14,
-    marginBottom: 10,
+
+  // Language Selection Styles
+  languageSection: {
+    marginBottom: 25,
+    zIndex: 1000, // Ensure dropdown appears above other elements
+  },
+
+  languageSelector: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  languageSelectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  selectedLanguageText: {
+    fontSize: 15,
+    color: '#374151',
     fontWeight: '500',
   },
-  uploadBox: {
-    height: 120,
-    // borderWidth: 2,
-    // borderColor: 'rgba(14, 15, 15, 0.93)',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(8, 7, 7, 0.59)',
-    marginBottom: 10,
+
+  languageDropdown: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginTop: 8,
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  uploadBoxSelected: {
-    borderColor: 'rgba(50, 205, 50, 0.3)',
-    backgroundColor: 'rgba(50, 205, 50, 0.05)',
+
+  languageList: {
+    maxHeight: 200,
   },
-  uploadText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  uploadTextSelected: {
-    color: '#32CD32',
-  },
-  fileInfoCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-  },
-  fileName: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 3,
-  },
-  fileInfo: {
-    color: '#aaa',
-    fontSize: 12,
-  },
-  processButton: {
-    backgroundColor: '#4a6da7',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  progressContainer: {
+
+  languageOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
-  progressIndicator: {
-    marginRight: 10,
+
+  selectedLanguageOption: {
+    backgroundColor: '#f0f9ff',
   },
-  buttonText: {
-    color: '#fff',
+
+  languageOptionText: {
+    fontSize: 15,
+    color: '#374151',
+  },
+
+  selectedLanguageOptionText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+
+  // Compact File Sections
+  fileSection: {
+    marginBottom: 25,
+  },
+
+  sectionLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  // Dashboard styles
-  dashboardContainer: {
-    flex: 1,
-    paddingVertical: 1,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#000',
-    borderRadius: 10,
-    marginBottom: 20,
-    padding: 3,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: '#4a6da7',
-  },
-  tabText: {
-    color: '#fff',
-    fontSize: 14,
-    marginLeft: 5,
-  },
-  activeTabText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  contentContainer: {
-    marginBottom: 20,
-  },
-  contentCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontWeight: '600',
+    color: '#374151',
     marginBottom: 12,
   },
-  cardTitle: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
+
+  optional: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9ca3af',
   },
-  contentText: {
-    color: '#000',
-    fontSize: 15,
-    lineHeight: 22,
+
+  // No Borders, Clean Design
+  uploadBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 18, // Compact size
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  shareButton: {
-    backgroundColor: '#4a6da7',
+
+  uploadBoxSelected: {
+    backgroundColor: '#f0fdf4',
+    shadowColor: '#10b981',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+
+  uploadContent: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 10,
+    marginRight: 15,
   },
-  shareButtonText: {
+
+  textContainer: {
+    flex: 1,
+  },
+
+  uploadText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+  },
+
+  uploadTextSelected: {
+    color: '#059669',
+    fontWeight: '600',
+  },
+
+  fileSize: {
+    fontSize: 13,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+
+  checkmark: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#10b981',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Process Section
+  processSection: {
+    marginTop: 30,
+  },
+
+  processButton: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#3b82f6',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  processingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  processButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     marginLeft: 8,
   },
-  newAnalysisButton: {
-    backgroundColor: '#32CD32',
+
+  progressContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+
+  progressBar: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#10b981',
+    borderRadius: 4,
+  },
+
+  progressText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+
+  // Dashboard
+  dashboardContainer: {
+    flex: 1,
+  },
+
+  contentContainer: {
+    flex: 1,
+    marginBottom: 20,
+  },
+
+  contentCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    flex: 1,
+  },
+
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 16,
+  },
+
+  cardContent: {
+    flex: 1,
+  },
+
+  contentText: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#374151',
+  },
+
+  saveButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: '#10b981',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
+
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+
+  newAnalysisButton: {
+    backgroundColor: '#6b7280',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+
   newAnalysisText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     marginLeft: 8,
-  }
-})
+  },
+});
 
 export default UploadPage;

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -14,14 +15,17 @@ import {
   Dimensions,
   PermissionsAndroid,
   Alert,
+  TextStyle, // Add this import
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
-import Markdown from "react-native-markdown-display";
 import RNFS from 'react-native-fs'; 
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import Markdown from 'react-native-markdown-display'; // Add this import
+
 const { width } = Dimensions.get('window');
 const audioRecorderPlayer = new AudioRecorderPlayer();
+
 interface Message {
   id: string;
   text: string;
@@ -29,6 +33,7 @@ interface Message {
   timestamp: Date;
   isLoading?: boolean;
 }
+
 async function requestMicrophonePermission() {
   if (Platform.OS === 'android') {
     try {
@@ -55,14 +60,14 @@ const ChatbotScreen = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hello! I'm your AI assistant. How can I help you today?",
+      text: "Hello! I'm your **AI assistant**. How can I help you today?",
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false); // State for voice recording
+  const [isRecording, setIsRecording] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const inputOpacity = useRef(new Animated.Value(1)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
@@ -75,6 +80,7 @@ const ChatbotScreen = () => {
       }, 200);
     }
   }, [messages]);
+
   const recordAudio = async () => {
     try {
       const hasPermission = await requestMicrophonePermission();
@@ -99,37 +105,34 @@ const ChatbotScreen = () => {
       
       const result = await audioRecorderPlayer.stopRecorder();
       audioRecorderPlayer.removeRecordBackListener();
-
       return await RNFS.readFile(result, 'base64');
     } catch (error) {
       console.error('Recording failed:', error);
       return '';
     }
   };
-  
 
   const startVoiceRecognition = async () => {
     try {
       setIsRecording(true);
       const audioData = await recordAudio();
-
       if (!audioData) {
         throw new Error('Failed to record audio');
       }
-
-      // Send the recorded audio to your backend for processing
+      
       const formData = new FormData();
       formData.append('audio', {
         uri: `data:audio/wav;base64,${audioData}`,
         type: 'audio/wav',
         name: 'recording.wav'
       } as any);
+      
       const response = await axios.post(
-        'http://127.0.0.1:5002/api/voice/process',
+        'http://127.0.0.1:5002/transcribe',
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
-
+      
       if (response.data.transcription) {
         setInputText(response.data.transcription);
         setMessages((prev) => [
@@ -146,11 +149,9 @@ const ChatbotScreen = () => {
     }
   };
 
-  
   const stopVoiceRecognition = async () => {
     try {
       setIsRecording(false);
-      // Stop recording logic here
     } catch (error) {
       console.error('Error stopping voice recognition:', error);
     }
@@ -180,7 +181,7 @@ const ChatbotScreen = () => {
 
     try {
       const response = await axios.post('http://127.0.0.1:5002/chatbot', { message: userMessage.text });
-
+      
       if (!response.data || !response.data.reply) {
         throw new Error('Invalid response from backend');
       }
@@ -231,64 +232,198 @@ const ChatbotScreen = () => {
   const formatTime = (date: Date) =>
     date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // Custom markdown styles for dark theme - Fixed TypeScript types
+  const markdownStyles: { [key: string]: TextStyle } = {
+    body: {
+      color: '#e5e7eb',
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: '400',
+    },
+    heading1: {
+      color: '#f9fafb',
+      fontSize: 18,
+      fontWeight: '700',
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    heading2: {
+      color: '#f3f4f6',
+      fontSize: 16,
+      fontWeight: '600',
+      marginTop: 6,
+      marginBottom: 3,
+    },
+    heading3: {
+      color: '#f3f4f6',
+      fontSize: 15,
+      fontWeight: '600',
+      marginTop: 4,
+      marginBottom: 2,
+    },
+    strong: {
+      color: '#ffffff',
+      fontWeight: '700',
+    },
+    em: {
+      color: '#d1d5db',
+      fontStyle: 'italic',
+    },
+    code_inline: {
+      color: '#20B2AA',
+      backgroundColor: '#374151',
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+      borderRadius: 3,
+      fontSize: 14,
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    code_block: {
+      color: '#e5e7eb',
+      backgroundColor: '#1f2937',
+      padding: 8,
+      borderRadius: 6,
+      fontSize: 14,
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+      marginVertical: 4,
+    },
+    blockquote: {
+      backgroundColor: '#374151',
+      borderLeftWidth: 4,
+      borderLeftColor: '#20B2AA',
+      paddingLeft: 8,
+      paddingVertical: 4,
+      marginVertical: 4,
+    },
+    list_item: {
+      color: '#e5e7eb',
+      marginBottom: 2,
+    },
+    bullet_list: {
+      marginVertical: 4,
+    },
+    ordered_list: {
+      marginVertical: 4,
+    },
+    link: {
+      color: '#60a5fa',
+      textDecorationLine: 'underline',
+    },
+    paragraph: {
+      marginBottom: 4,
+      flexWrap: 'wrap',
+    },
+  } as const;
+
   const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.messageContainer, item.isUser ? styles.userMessageContainer : styles.botMessageContainer]}>
+    <Animated.View style={[
+      styles.messageContainer, 
+      item.isUser ? styles.userMessageContainer : styles.botMessageContainer
+    ]}>
       {!item.isUser && (
         <View style={styles.botAvatar}>
-          <Image source={require('../assets/gemini.png')} style={{ width: 27, height: '80%',padding: 5,resizeMode: 'contain' }} />
+          <View style={styles.botAvatarInner}>
+            <Text style={styles.botAvatarText}>AI</Text>
+          </View>
         </View>
       )}
-      <View style={[styles.messageBubble, item.isUser ? styles.userMessageBubble : styles.botMessageBubble]}>
-        <Text style={styles.messageText}><Markdown>{item.text}</Markdown></Text>
-        <Text style={styles.timestampText}>{formatTime(item.timestamp)}</Text>
+      
+      <View style={[
+        styles.messageBubble, 
+        item.isUser ? styles.userMessageBubble : styles.botMessageBubble
+      ]}>
+        {item.isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#20B2AA" />
+            <Text style={styles.loadingText}>Thinking...</Text>
+          </View>
+        ) : (
+          <>
+            {/* Render markdown for bot messages, plain text for user messages */}
+            {item.isUser ? (
+              <Text style={[
+                styles.messageText,
+                styles.userMessageText
+              ]}>
+                {item.text}
+              </Text>
+            ) : (
+              <Markdown style={markdownStyles}>
+                {item.text}
+              </Markdown>
+            )}
+            <Text style={styles.timestampText}>{formatTime(item.timestamp)}</Text>
+          </>
+        )}
       </View>
-    </View>
+    </Animated.View>
   );
 
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerIcon}>
+            <Text style={styles.headerIconText}>◐</Text>
+          </View>
+          <Text style={styles.headerTitle}>AI Assistant</Text>
+        </View>
+      </View>
+
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesContainer}
+        showsVerticalScrollIndicator={false}
       />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.inputContainer}>
-          {/* Voice Button */}
-          <TouchableOpacity
-            style={styles.voiceButton}
-            onPress={isRecording ? stopVoiceRecognition : startVoiceRecognition}
-          >
-           <Image 
-                 source={require('../assets/mic.svg')} 
-                 style={{ width: 25, height: 25 ,resizeMode: 'contain',}}
-               />
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: isRecording ? 1.05 : 1 }] }}>
+            <TouchableOpacity
+              style={[styles.voiceButton, isRecording && styles.voiceButtonActive]}
+              onPress={isRecording ? stopVoiceRecognition : startVoiceRecognition}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons 
+                name={isRecording ? "stop" : "mic"} 
+                size={18} 
+                color={isRecording ? "#ff6b6b" : "#20B2AA"} 
+              />
+            </TouchableOpacity>
+          </Animated.View>
 
-          {/* Text Input */}
           <Animated.View style={[styles.textInputContainer, { opacity: inputOpacity }]}>
             <TextInput
               style={styles.input}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Type a message..."
-              placeholderTextColor="#999"
+              placeholder="Ask me anything..."
+              placeholderTextColor="#6b7280"
               onFocus={handleInputFocus}
               multiline
+              maxLength={1000}
             />
           </Animated.View>
 
-          {/* Send Button */}
           <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
             <TouchableOpacity
-              style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+              style={[
+                styles.sendButton,
+                !inputText.trim() && styles.sendButtonDisabled
+              ]}
               onPress={handleButtonPress}
               disabled={!inputText.trim() || isLoading}
+              activeOpacity={0.8}
             >
-              <Image source={require('../assets/send.png')} style={{ width: 45, height: 45 ,resizeMode: 'contain'}} />
+              <MaterialIcons 
+                name="arrow-upward" 
+                size={18} 
+                color={!inputText.trim() ? "#6b7280" : "#1f2937"} 
+              />
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -297,39 +432,53 @@ const ChatbotScreen = () => {
   );
 };
 
+// Keep all your existing styles unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#0f1419', // Perplexity's dark background
   },
   header: {
-    backgroundColor: '#4a6da7',
-    paddingVertical: 15,
+    backgroundColor: '#1a1f2e',
+    paddingTop: Platform.OS === 'ios' ? 45 : 20,
+    paddingBottom: 12,
     paddingHorizontal: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2d3748',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerTitle: {
+  headerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#20B2AA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  headerIconText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 10,
+  },
+  headerTitle: {
+    color: '#f7fafc',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   messagesContainer: {
-    paddingHorizontal: 10,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexGrow: 1,
   },
   messageContainer: {
-    marginBottom: 15,
+    marginBottom: 16,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   userMessageContainer: {
     justifyContent: 'flex-end',
@@ -338,94 +487,126 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   messageBubble: {
-    maxWidth: width * 0.7,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 20,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    maxWidth: width * 0.85,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginLeft: 8,
   },
   userMessageBubble: {
-    backgroundColor: 'rgba(128, 185, 223, 0.7)',
-    borderBottomRightRadius: 5,
-    marginRight: 5,
+    backgroundColor: '#2563eb',
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
   },
   botMessageBubble: {
-    backgroundColor: 'rgba(128, 185, 223, 0.7)',
-    borderBottomLeftRadius: 5,
-    marginLeft: 5,
+    backgroundColor: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#374151',
+    borderBottomLeftRadius: 4,
   },
   messageText: {
-    color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '400',
+  },
+  userMessageText: {
+    color: '#ffffff',
+  },
+  botMessageText: {
+    color: '#e5e7eb',
   },
   timestampText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 10,
+    color: '#9ca3af',
+    fontSize: 11,
+    marginTop: 6,
     alignSelf: 'flex-end',
-    marginTop: 5,
-  },
-  userAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#4a6da7',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   botAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#6c8cbf',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 2,
+  },
+  botAvatarInner: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#20B2AA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botAvatarText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginLeft: 8,
+    fontStyle: 'italic',
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#1a1f2e',
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#2d3748',
   },
   textInputContainer: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#374151',
     borderRadius: 20,
-    paddingHorizontal: 15,
-    marginHorizontal: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginHorizontal: 8,
+    minHeight: 40,
+    maxHeight: 120,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#4b5563',
   },
   input: {
-    fontSize: 16,
-    maxHeight: 100,
-    paddingVertical: 10,
-    color: '#333',
-  },
-  attachButton: {
-    padding: 8,
+    fontSize: 15,
+    color: '#f3f4f6',
+    fontWeight: '400',
+    textAlignVertical: 'center',
+    paddingVertical: 8,
   },
   sendButton: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: '#4a6da7',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#20B2AA',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 2,
   },
   sendButtonDisabled: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#4b5563',
   },
-  markdownText: {
-    fontSize: 16,
-    color: '#fff', 
+  voiceButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#374151',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+    borderWidth: 1,
+    borderColor: '#4b5563',
   },
-  voiceButton: { // Style for voice button
-    padding: 10,
+  voiceButtonActive: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#ff6b6b',
   },
 });
 

@@ -1,29 +1,10 @@
-// import React, { createContext, useState, ReactNode } from "react";
-
-// interface AuthContextType {
-//   user: { email: string } | null;
-//   setUser: (user: { email: string } | null) => void;
-// }
-
-// export const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// export const AuthProvider = ({ children }: { children: ReactNode }) => {
-//   const [user, setUser] = useState<{ email: string } | null>(null);
-
-//   return (
-//     <AuthContext.Provider value={{ user, setUser }}>
-//       {children}
-//     </AuthContext.Provider>
-//   );
-// };
-// src/context/AuthContext.tsx
 import React, { createContext, useState, useEffect, ReactNode, useContext } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as authApi from '../api/authApi';
 import { sendPasswordResetEmail, resetPassword } from '../services/authService';
 // Re-export the User interface from authApi
 export type { User } from '../api/authApi';
-
+import {} from "../api/authApi";
 interface AuthContextType {
   user: authApi.User | null;
   token: string | null;
@@ -56,39 +37,83 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
 
   // Load user on startup
-  useEffect(() => {
-    const loadToken = async () => {
-      try {
-        const savedToken = await AsyncStorage.getItem('authToken');
-        
-        // if (savedToken) {
-        //   setToken(savedToken);
-        //   const userData = await authApi.getUserProfile();
-        //   setUser(userData);
-        // }
-        if (savedToken) {
-          try {
-            // Try parsing the token in case it was stored as a stringified JSON object
-            const parsedToken = JSON.parse(savedToken);
-            setToken(parsedToken);
-          } catch (parseError) {
-            // If the token is a simple string, set it directly without parsing
-            setToken(savedToken);
-          }
+  // useEffect(() => {
+  //   const loadToken = async () => {
+  //     try {
+  //       const savedToken = await AsyncStorage.getItem('authToken');
+  //       const authData = await authApi.getAuth();
+  //       if (authData) {
+  //     setToken(authData.token);
+  //     setUser(authData.user);
+  //   }
+  //       // if (savedToken) {
+  //       //   setToken(savedToken);
+  //       //   const userData = await authApi.getUserProfile();
+  //       //   setUser(userData);
+  //       // }
+  //       if (savedToken) {
+  //         try {
+  //           // Try parsing the token in case it was stored as a stringified JSON object
+  //           // const parsedToken = JSON.parse(savedToken);
+  //            const cleanedToken = savedToken.replace(/^"(.*)"$/, '$1');
+  //           setToken(cleanedToken);
+            
+  //         } catch (parseError) {
+  //           // If the token is a simple string, set it directly without parsing
+  //           setToken(savedToken);
+  //         }
   
-          // Retrieve the user profile using the saved token
-          const userData = await authApi.getUserProfile();
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error('Failed to load user', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  //         // Retrieve the user profile using the saved token
+  //         const userData = await authApi.getUserProfile();
+  //         setUser(userData);
+  //       }
+  //     } catch (error) {
+  //        const savedToken = await AsyncStorage.getItem('authToken');
+        
+  //       console.log("before error",savedToken)
+  //       console.error('Failed to load user', error);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
     
-    loadToken();
-  }, []);
+  //   loadToken();
+  // }, []);
+useEffect(() => {
+  const loadAuth = async () => {
+    try {
+      // Try to get stored auth data (token + user)
+      const authData = await authApi.getAuth();
+
+      if (authData) {
+        setToken(authData.token);
+        setUser(authData.user);
+      } else {
+        // If nothing found, try to fallback to just token (older storage logic)
+        const savedToken = await authApi.getToken();
+        if (savedToken) {
+          setToken(savedToken);
+
+          // Fetch latest user profile if token exists
+          const userData = await authApi.getUserProfile();
+       if (userData) {
+  setUser(userData);   // ✅ userData itself is the User
+} else {
+  setUser(null);
+}
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load auth data:", error);
+      setUser(null);
+      setToken(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadAuth();
+}, []);
 
   // const login = async (email: string, password: string) => {
   //   try {
@@ -125,6 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Verify token is stored correctly
       await authApi.storeToken(response.token);
+      await authApi.storeAuth(response);
       const storedToken = await authApi.getToken();
       console.log("Token stored and retrieved:", !!storedToken);
       
