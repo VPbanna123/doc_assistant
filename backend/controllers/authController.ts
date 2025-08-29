@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../model/user';
 import dotenv from 'dotenv';
 import sendVerificationemail from "../utils/sendVErificationemail"
+import sendOTPemail from '../utils/sendOTPemail';
 dotenv.config();
 
 // Helper function for consistent error responses
@@ -206,6 +207,7 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
   } catch (error) {
     console.error('Get user error:', error);
     handleError(res, 500, 'Server error retrieving user data');
+    
   }
 };
 
@@ -257,6 +259,96 @@ if (bio) updateData.bio = bio;
     handleError(res, 500, 'Server error updating profile');
   }
 };
+
+export const ForgotPassword=async(req:Request,res:Response):Promise<void>=>{
+  try {
+      // const userId=req.user?.id;
+      const {email}=req.body
+      if(!email)
+      {
+        handleError(res,401,"please enter your email")
+        return;
+      }
+      const user= await User.findOne({email})
+      if(!user)
+      {
+        handleError(res,401,"please enter a valid email")
+        return;
+      }
+
+      if(!user?.isVerified){
+         handleError(res,403,"user is not verified")
+         return ;
+      }
+
+      const otpCode=Math.floor(100000+Math.random()*900000).toString();
+      user.resetOTP=otpCode;
+      user.resetOTPExpires=new Date(Date.now()+5*60*1000);
+      await user?.save();
+
+      await sendOTPemail(email,user?.name,otpCode)
+
+      res.status(200).json({message:"otp sent to your email"})
+  } catch (error) {
+    
+  }
+}
+
+export const VerifyOtp=async(req:Request,res:Response):Promise<void>=>{
+  try {
+    const {email,otp}=req.body;
+if((!email||!otp)){
+  handleError(res,400,"email and otp are required")
+  return;
+}
+  const user=await User.findOne({email})
+  if(!user||!user.resetOTP||!user.resetOTPExpires)
+  {
+    handleError(res,400,"otp is required")
+    return;
+  }
+  const now=new Date();
+  if(user.resetOTP!==otp||user.resetOTPExpires<now)
+  {
+    handleError(res,400,"inavlaid or expired otp")
+    return ;
+  }
+user.resetOTPVerified=true;
+console.log("user verification is",user.resetOTPVerified);
+await user?.save();
+console.log("otp is verified")
+res.status(200).json({ success: true, message:"otp verified"})
+
+  } catch (error) {
+    console.error(error);
+    handleError(res,500,"server error");
+  }
+}
+export const resetPassword=async(req:Request,res:Response):Promise<void>=>{
+try {
+  const {email,newPassword}=req.body;
+  if(!email||!newPassword){
+    handleError(res,400,"email and password is required")
+return;
+  }
+    const user =await User.findOne({email});
+  if(!user||!user.resetOTPVerified)
+  {
+    handleError(res,403,"otp not verified")
+    return;
+  }
+
+  user.password=await bcrypt.hash(newPassword,10);
+  user.resetOTP=null;
+  user.resetOTPExpires=null;
+  user.resetOTPVerified=false;
+  await user?.save();
+res.status(200).json({message:"password reset successfully"})
+} catch (error) {
+  console.error(error);
+  handleError(res,500,"server error")
+}
+}
 
 // Change password
 export const changePassword = async (req: Request, res: Response): Promise<void> => {

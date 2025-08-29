@@ -10,7 +10,10 @@ export interface IUser extends Document {
     filename: string;
     createdAt: Date;
   }>
-  isVerified:boolean
+  isVerified:boolean;
+  resetOTP:string|null;
+  resetOTPExpires:Date|null;
+  resetOTPVerified:boolean;
 }
 const HistoryItemSchema: Schema = new Schema({
   filename: { type: String, required: true },
@@ -25,6 +28,9 @@ const UserSchema: Schema = new Schema({
   bio: { type: String },
   history: [HistoryItemSchema],
   isVerified: { type: Boolean, default: false },
+  resetOTP: { type: String ,default:null},
+resetOTPExpires: { type: Date ,default:null},
+resetOTPVerified: { type: Boolean, default: false },
 });
 
 export default mongoose.model<IUser>('User', UserSchema);
