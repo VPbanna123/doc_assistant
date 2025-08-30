@@ -30,3 +30,9 @@ streamlit
 # Utils
 backoff
 markdown
+
+# Whisper dependencies
+faster-whisper
+pydub
+soundfile
+pyaudioop   
