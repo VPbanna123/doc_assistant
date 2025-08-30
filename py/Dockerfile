@@ -19,4 +19,5 @@ COPY . .
 EXPOSE 10000
 
 # Start FastAPI with Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
+CMD ["uvicorn", "py.main:app", "--host", "0.0.0.0", "--port", "10000"]
+
