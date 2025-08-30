@@ -1,4 +1,7 @@
-
+try:
+    import audioop
+except ImportError:
+    audioop = None 
 import os
 import tempfile
 import logging

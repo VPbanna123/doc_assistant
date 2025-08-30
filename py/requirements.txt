@@ -30,4 +30,4 @@ streamlit
 # Utils
 backoff
 markdown
-pyaudioop==0.2.5
+
