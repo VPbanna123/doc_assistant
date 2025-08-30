@@ -35,4 +35,3 @@ markdown
 faster-whisper
 pydub
 soundfile
-pyaudioop   
