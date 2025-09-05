@@ -2,10 +2,6 @@
 
 1. Kamal Nayan Kumar - 23BDS026
 2. Vijay Pal Singh Rathore - 23BDS067
-3. Tejas Chalwadi- 23BDS063
-4. Rahul Patel - 23BDS047
-5. Karan Kabdal - 23BDS028
-6. Yash Srivastava - 23BDS071
 
 ---
 ### Datasets for Testing
